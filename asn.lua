@@ -1,13 +1,14 @@
 if not verbana then verbana = {} end
-if not verbana.ip then dofile('ipmanip.lua') end
+if not verbana.modpath then verbana.modpath = '.' end
+if not verbana.ip then dofile(verbana.modpath .. '/ipmanip.lua') end
 if not verbana.log then function verbana.log(_, message, ...) print(message:format(...)) end end
-verbana.asn_db = {}
+verbana.asn = {}
 
 local ASN_DESCRIPTION_FILE = 'data-used-autnums'
 local NETWORK_ASN_FILE = 'data-raw-table'
 
 local function load_file(filename)
-    local file = io.open(filename, 'r')
+    local file = io.open(('%s/%s'):format(verbana.modpath, filename), 'r')
     if not file then
         verbana.log('error', 'error opening "%s"', filename)
         return
@@ -31,7 +32,7 @@ local function refresh_asn_descriptions()
         end
     end
 
-    verbana.asn_db.description = description
+    verbana.asn.description = description
 end
 
 local function refresh_asn_table()
@@ -77,10 +78,10 @@ local function refresh_asn_table()
         end
     end
 
-    verbana.asn_db.network = networks
+    verbana.asn.network = networks
 end
 
-function verbana.asn_db.refresh()
+function verbana.asn.refresh()
     local start = os.clock()
     refresh_asn_descriptions()
     refresh_asn_table()
@@ -88,34 +89,34 @@ function verbana.asn_db.refresh()
     verbana.log('action', 'refreshed ASN tables in %s seconds', os.clock() - start)
 end
 
-verbana.asn_db.refresh()
+verbana.asn.refresh()
 
 local function find(ipint)
-    local t = verbana.asn_db.network
-    local low = 0
+    local t = verbana.asn.network
+    local low = 1
     local high = #t
     while low <= high do
         local mid = math.floor((low + high) / 2)
+        verbana.log('action', '%s %s %s %s %s', ipint, low, mid, high, #t)
         local element = t[mid]
         local start = element[1]
         local end_ = element[2]
-        local asn = element[3]
 
         if start <= ipint and ipint <= end_ then
-            return asn
+            return element[3]
         elseif start > ipint then
-            low = mid + 1
-        else
             high = mid - 1
+        else
+            low = mid + 1
         end
     end
 end
 
-function verbana.asn_db.lookup(ipstr)
+function verbana.asn.lookup(ipstr)
     local ipint = verbana.ip.ipstr_to_number(ipstr)
     local asn = find(ipint)
     if asn then
-        return asn, verbana.asn_db.description[asn]
+        return asn, verbana.asn.description[asn]
     else
         return nil, nil
     end

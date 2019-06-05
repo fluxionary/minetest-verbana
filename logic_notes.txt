@@ -1,0 +1,60 @@
+TODO: turn this into proper documentation
+
+new player logs in from a DEFAULT ip/network
+    status = default
+new player logs in from a DANGEROUS ip/network
+    if player is whitelisted: status = default
+    else: status = unverified; alert mods
+new player logs in from a BLOCKED ip/network
+    if player is whitelisted: let them in
+    else: status is not changed (we should refuse to allow them to register the account)
+
+old player logs in from a DEFAULT ip/network
+    if status is banned, boot them
+    if status is temp banned, check expiry and conditionally boot them
+    if status is locked, boot them BUT ALERT MODS
+    if status is suspicious, let them in BUT ALERT MODS
+    else allow them in
+old player logs in from a DANGEROUS ip/network
+    if player has never used that ip/network
+        if the player is whitelisted let them in
+        else refuse entry
+    else
+        if the player is whitelisted, let them in
+        if the player is banned/tempbanned/locked, as for default ip/net status
+        else let them in, but alert mods
+old player logs in from a BLOCKED ip/network
+    if the player is whitelisted, let them in
+    else refuse entry
+
+when status == default:
+    account can be banned
+    account can be temp banned
+    account can be locked
+    account can be whitelisted by admins
+    account can be be marked suspicious
+    account can be unverified (sent back to verification area)
+when status == unverified
+    account can be verified (status -> default)
+    account can be banned, tempbanned, locked
+    account can be whitelisted by admins (also lets them out of verification area)
+    account can be marked suspicious (also lets them out of verification area)
+when status == banned
+    account can be unbanned (status -> default | suspicious depending on network)
+    account can be tempbanned (override previous behavior)
+    account can be locked (override previous behavior)
+when status == tempbanned
+    account can be unbanned (status -> default | suspicious depending on network)
+    account can be banned (override previous behavior)
+    account can be locked (override previous behavior)
+when status == locked
+    account can be unlocked (status -> default | suspicious depending on network)
+    account can be banned (override previous behavior)
+    account can be tempbanned (override previous behavior)
+when status == whitelisted
+    account can be locked by mods
+    account can be unwhitelisted by admins (status -> default)
+    account can be banned by admins
+    account can be tempbanned by admins
+when status == suspicious
+    as for default, mutatis mutandis

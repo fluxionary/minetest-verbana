@@ -2,13 +2,19 @@ if not verbana then verbana = {} end
 
 verbana.ip = {}
 
-function verbana.ip.ipstr_to_number(ip)
-    local a, b, c, d = ip:match('^(%d+)%.(%d+)%.(%d+)%.(%d+)$')
+function verbana.ip.is_valid_ip(ipstr)
+    local a, b, c, d = ipstr:match('^(%d+)%.(%d+)%.(%d+)%.(%d+)$')
+    if not a and b and c and d then return false end
     a = tonumber(a)
     b = tonumber(b)
     c = tonumber(c)
     d = tonumber(d)
-    return (a * 16777216) + (b * 65536) + (c * 256) + d
+    return 0 <= a and a < 256 and 0 <= b and b < 256 and 0 <= c and c < 256 and 0 <= d and d < 256
+end
+
+function verbana.ip.ipstr_to_number(ipstr)
+    local a, b, c, d = ipstr:match('^(%d+)%.(%d+)%.(%d+)%.(%d+)$')
+    return (tonumber(a) * 16777216) + (tonumber(b) * 65536) + (tonumber(c) * 256) + tonumber(d)
 end
 
 function verbana.ip.number_to_ipstr(number)
