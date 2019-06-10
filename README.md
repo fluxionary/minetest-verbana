@@ -43,6 +43,6 @@ blocking and verification.
 3. There is a three tiered privilege system: Normal players, moderators,
    and admins. Moderators may ban and verify players, but only admins have
    the ability to mark IPs and networks as untrusted. This way, player's
-   personal details may be kept private. However, oderators may execute queries
+   personal details may be kept private. However, operators may execute queries-
    to determine if a player is associated with other banned players by IP or
    network.

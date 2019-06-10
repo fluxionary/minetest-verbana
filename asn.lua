@@ -113,7 +113,12 @@ local function find(ipint)
 end
 
 function verbana.asn.lookup(ipstr)
-    local ipint = verbana.ip.ipstr_to_number(ipstr)
+    local ipint
+    if type(ipstr) == 'number' then
+        ipint = ipstr
+    else
+        ipint = verbana.ip.ipstr_to_number(ipstr)
+    end
     local asn = find(ipint)
     if asn then
         return asn, verbana.asn.description[asn]

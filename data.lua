@@ -3,11 +3,7 @@ if not verbana.modpath then verbana.modpath = '.' end
 if not verbana.ip then dofile(verbana.modpath .. '/ipmanip.lua') end
 if not verbana.log then function verbana.log(_, message, ...) print(message:format(...)) end end
 
-local ie = minetest.request_insecure_environment()
-if not ie then
-	error('Verbana will not work unless it has been listed under secure.trusted_mods in minetest.conf')
-end
-
+local ie = verbana.ie
 local sql = ie.require("lsqlite3")
 local db = sql.open(('%s/verbana.sqlite'):format(minetest.get_worldpath())) -- TODO get path from settings
 sqlite3 = nil -- remove sqlite3 from the global (secure) namespace
@@ -36,13 +32,14 @@ CREATE TABLE IF NOT EXISTS player_status (
   CREATE INDEX IF NOT EXISTS player_status_name ON player_status(name);
   INSERT OR IGNORE INTO player_status
          (id, name)
-  VALUES ( 0, 'default')
-       , ( 1, 'unverified')
-       , ( 2, 'banned')
-       , ( 3, 'tempbanned')
-       , ( 4, 'locked')
-       , ( 5, 'whitelisted')
-       , ( 6, 'suspicious');
+  VALUES ( 0, 'unknown')
+       , ( 1, 'default')
+       , ( 2, 'unverified')
+       , ( 3, 'banned')
+       , ( 4, 'tempbanned')
+       , ( 5, 'locked')
+       , ( 6, 'whitelisted')
+       , ( 7, 'suspicious');
 
 CREATE TABLE IF NOT EXISTS player (
     id             INTEGER PRIMARY KEY AUTOINCREMENT
@@ -55,6 +52,7 @@ CREATE TABLE IF NOT EXISTS player (
   CREATE UNIQUE INDEX IF NOT EXISTS player_name ON player(name);
   CREATE INDEX IF NOT EXISTS player_main_player_id ON player(main_player_id);
   CREATE INDEX IF NOT EXISTS player_last_action_id ON player(last_action_id);
+  INSERT OR IGNORE INTO player (name) VALUES ('!verbana!');
 
 CREATE TABLE IF NOT EXISTS player_action_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT
@@ -81,9 +79,10 @@ CREATE TABLE IF NOT EXISTS ip_status (
   INSERT OR IGNORE INTO ip_status
          (id, name)
   VALUES ( 0, 'default')
-       , ( 1, 'untrusted')
-       , ( 2, 'blocked')
-       , ( 3, 'tempblocked');
+       , ( 1, 'trusted')
+       , ( 2, 'suspicious')
+       , ( 3, 'blocked')
+       , ( 4, 'tempblocked');
 
 CREATE TABLE IF NOT EXISTS ip (
     ip             INTEGER PRIMARY KEY
@@ -117,7 +116,7 @@ CREATE TABLE IF NOT EXISTS asn_status (
   INSERT OR IGNORE INTO asn_status
          (id, name)
   VALUES ( 0, 'default')
-       , ( 1, 'untrusted')
+       , ( 1, 'suspicious')
        , ( 2, 'blocked')
        , ( 3, 'tempblocked');
 
@@ -149,6 +148,7 @@ CREATE TABLE IF NOT EXISTS log (
     player_id INTEGER NOT NULL
   , ip        INTEGER NOT NULL
   , asn       INTEGER NOT NULL
+  , success   INTEGER NOT NULL
   , timestamp INTEGER NOT NULL
   , FOREIGN KEY (player_id) REFERENCES player(id)
   , FOREIGN KEY (ip)        REFERENCES ip(ip)
@@ -177,3 +177,46 @@ PRAGMA foreign_keys = ON;
 end -- init_db()
 
 init_db()
+
+function verbana.data.get_player_id(name) end
+function verbana.data.get_player_status(player_id) return {} end
+function verbana.data.set_player_status(player_id, executod_id, status_name, reason, expires) end
+function verbana.data.ban_player(player_id, executor_id, reason) end
+function verbana.data.tempban_player(player_id, executor_id, reason, expires) end
+function verbana.data.unban_player(player_id, executor_id, reason) end
+function verbana.data.verify_player(player_id, executor_id, reason) end
+function verbana.data.unverify_player(player_id, executor_id, reason) end
+function verbana.data.lock_player(player_id, executor_id, reason) end
+function verbana.data.unlock_player(player_id, executor_id, reason) end
+function verbana.data.whitelist_player(player_id, executor_id, reason) end
+function verbana.data.unwhitelist_player(player_id, executor_id, reason) end
+function verbana.data.suspect_player(player_id, executor_id, reason) end
+function verbana.data.unsuspect_player(player_id, executor_id, reason) end
+
+function verbana.data.get_ip_status(ipint) return {} end
+function verbana.data.set_ip_status(ipint, executor_id, status_name, reason, expires) end
+function verbana.data.block_ip(ipint, executor_id, reason) end
+function verbana.data.tempblock_ip(ipint, executor_id, reason, expires) end
+function verbana.data.unblock_ip(ipint, executor_id, reason) end
+function verbana.data.trust_ip(ipint, executor_id, reason) end
+function verbana.data.untrust_ip(ipint, executor_id, reason) end
+function verbana.data.suspect_ip(ipint, executor_id, reason) end
+function verbana.data.unsuspect_ip(ipint, executor_id, reason) end
+
+function verbana.data.get_asn_status(asn) return {} end
+function verbana.data.set_asn_status(asn, executor_id, status_name, reason, expires) end
+function verbana.data.block_asn(asn, executor_id, reason) end
+function verbana.data.tempblock_asn(asn, executor_id, reason, expires) end
+function verbana.data.unblock_asn(asn, executor_id, reason) end
+function verbana.data.suspect_asn(asn, executor_id, reason) end
+function verbana.data.unsuspect_asn(asn, executor_id, reason) end
+
+function verbana.data.log(player_id, ipint, asn, success) end
+
+function verbana.data.assoc(player_id, ipint, asn) end
+function verbana.data.has_asn_assoc(player_id, asn) end
+function verbana.data.has_ip_assoc(player_id, ipint) end
+
+-- TODO: methods to get logs of player_status, ip_status, asn_status
+-- TODO: methods to get connection logs by player, ip, asn
+-- TODO: methods to get association logs by player, ip, asn
