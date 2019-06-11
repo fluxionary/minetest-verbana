@@ -1,182 +1,97 @@
 if not verbana then verbana = {} end
 if not verbana.modpath then verbana.modpath = '.' end
-if not verbana.ip then dofile(verbana.modpath .. '/ipmanip.lua') end
+if not verbana.ip then dofile(verbana.modpath .. '/lib_ip.lua') end
 if not verbana.log then function verbana.log(_, message, ...) print(message:format(...)) end end
 
-local ie = verbana.ie
-local sql = ie.require("lsqlite3")
-local db = sql.open(('%s/verbana.sqlite'):format(minetest.get_worldpath())) -- TODO get path from settings
-sqlite3 = nil -- remove sqlite3 from the global (secure) namespace
+local sql = verbana.sql
+local db = verbana.db
 
-minetest.register_on_shutdown(function()
-	db:close()
-end)
+local load_file = verbana.util.load_file
+
+verbana.data.player_status_id = {
+    unknown=0,
+    default=1,
+    unverified=2,
+    banned=3,
+    tempbanned=4,
+    locked=5,
+    whitelisted=6,
+    suspicious=7,
+}
+verbana.data.player_status = verbana.util.table_invert(verbana.data.player_status_id)
+verbana.data.ip_status_id = {
+    default=0,
+    trusted=1,
+    suspicious=2,
+    blocked=3,
+    tempblocked=4,
+}
+verbana.data.ip_status = verbana.util.table_invert(verbana.data.ip_status_id)
+verbana.data.asn_status_id = {
+    default=0,
+    suspicious=1,
+    blocked=2,
+    tempblocked=3,
+}
+verbana.data.asn_status = verbana.util.table_invert(verbana.data.asn_status_id)
+verbana.data.verbana_player = '!verbana!'
+verbana.data.verbana_player_id = 1
 
 local function db_exec(stmt)
     local status = db:exec(stmt)
     if status ~= sql.OK then
-        verbana.log('error', 'SQLite ERROR: %s', db:errmsg())
+        verbana.log('error', 'SQLite ERROR executing %q: %s', stmt, db:errmsg())
         return false
     end
     return true
 end
 
+local function get_full_table(query)
+    local table = {}
+
+    local function populate_table(udata, cols, values, names)
+        local row = {}
+        for col_id = 1,cols do
+            row[names[col_id]] = values[col_id]
+        end
+        table.insert(row)
+    end
+
+    local status = db:exec(query, populate_table)
+
+    if status ~= sql.OK then
+        verbana.log('error', 'SQLite ERROR executing %q: %s', query, db:errmsg())
+        return
+    end
+
+    return table
+end
+
 local function init_db()
-    db_exec([[
-PRAGMA foreign_keys = OFF;
--- PLAYER
-CREATE TABLE IF NOT EXISTS player_status (
-    id   INTEGER PRIMARY KEY
-  , name TEXT NOT NULL
-);
-  CREATE INDEX IF NOT EXISTS player_status_name ON player_status(name);
-  INSERT OR IGNORE INTO player_status
-         (id, name)
-  VALUES ( 0, 'unknown')
-       , ( 1, 'default')
-       , ( 2, 'unverified')
-       , ( 3, 'banned')
-       , ( 4, 'tempbanned')
-       , ( 5, 'locked')
-       , ( 6, 'whitelisted')
-       , ( 7, 'suspicious');
-
-CREATE TABLE IF NOT EXISTS player (
-    id             INTEGER PRIMARY KEY AUTOINCREMENT
-  , name           TEXT NOT NULL
-  , main_player_id INTEGER
-  , last_action_id INTEGER
-  , FOREIGN KEY (main_player_id) REFERENCES player(id)
-  , FOREIGN KEY (last_action_id) REFERENCES player_action_log(id)
-);
-  CREATE UNIQUE INDEX IF NOT EXISTS player_name ON player(name);
-  CREATE INDEX IF NOT EXISTS player_main_player_id ON player(main_player_id);
-  CREATE INDEX IF NOT EXISTS player_last_action_id ON player(last_action_id);
-  INSERT OR IGNORE INTO player (name) VALUES ('!verbana!');
-
-CREATE TABLE IF NOT EXISTS player_action_log (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT
-  , executor_id INTEGER NOT NULL
-  , player_id   INTEGER NOT NULL
-  , status_id   INTEGER NOT NULL
-  , timestamp   INTEGER NOT NULL
-  , reason      TEXT
-  , expires     INTEGER
-  , FOREIGN KEY (executor_id) REFERENCES player(id)
-  , FOREIGN KEY (player_id) REFERENCES player(id)
-  , FOREIGN KEY (status_id) REFERENCES player_status(id)
-);
-  CREATE INDEX IF NOT EXISTS player_action_log_player_id ON player_action_log(player_id);
-  CREATE INDEX IF NOT EXISTS player_action_log_timestamp ON player_action_log(timestamp);
-  CREATE INDEX IF NOT EXISTS player_action_log_reason    ON player_action_log(reason);
--- END PLAYER
--- IP
-CREATE TABLE IF NOT EXISTS ip_status (
-    id   INTEGER PRIMARY KEY
-  , name TEXT NOT NULL
-);
-  CREATE INDEX IF NOT EXISTS ip_status_name ON ip_status(name);
-  INSERT OR IGNORE INTO ip_status
-         (id, name)
-  VALUES ( 0, 'default')
-       , ( 1, 'trusted')
-       , ( 2, 'suspicious')
-       , ( 3, 'blocked')
-       , ( 4, 'tempblocked');
-
-CREATE TABLE IF NOT EXISTS ip (
-    ip             INTEGER PRIMARY KEY
-  , last_action_id INTEGER
-  , FOREIGN KEY (last_action_id) REFERENCES ip_action_log(id)
-);
-  CREATE INDEX IF NOT EXISTS ip_last_action_id ON ip(last_action_id);
-
-CREATE TABLE IF NOT EXISTS ip_action_log (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT
-  , executor_id INTEGER NOT NULL
-  , ip          INTEGER NOT NULL
-  , status_id   INTEGER NOT NULL
-  , timestamp   INTEGER NOT NULL
-  , reason      TEXT
-  , expires     INTEGER
-  , FOREIGN KEY (executor_id) REFERENCES player(id)
-  , FOREIGN KEY (ip) REFERENCES ip(ip)
-  , FOREIGN KEY (status_id) REFERENCES ip_status(id)
-);
-  CREATE INDEX IF NOT EXISTS ip_action_log_ip        ON ip_action_log(ip);
-  CREATE INDEX IF NOT EXISTS ip_action_log_timestamp ON ip_action_log(timestamp);
-  CREATE INDEX IF NOT EXISTS ip_action_log_reason    ON ip_action_log(reason);
--- END IP
--- ASN
-CREATE TABLE IF NOT EXISTS asn_status (
-    id   INTEGER PRIMARY KEY
-  , name TEXT NOT NULL
-);
-  CREATE INDEX IF NOT EXISTS asn_status_name ON asn_status(name);
-  INSERT OR IGNORE INTO asn_status
-         (id, name)
-  VALUES ( 0, 'default')
-       , ( 1, 'suspicious')
-       , ( 2, 'blocked')
-       , ( 3, 'tempblocked');
-
-CREATE TABLE IF NOT EXISTS asn (
-    asn       INTEGER PRIMARY KEY
-  , last_action_id INTEGER
-  , FOREIGN KEY (last_action_id) REFERENCES asn_action_log(id)
-);
-  CREATE INDEX IF NOT EXISTS asn_last_action_id ON asn(last_action_id);
-
-CREATE TABLE IF NOT EXISTS asn_action_log (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT
-  , executor_id INTEGER NOT NULL
-  , asn         INTEGER NOT NULL
-  , status_id   INTEGER NOT NULL
-  , timestamp   INTEGER NOT NULL
-  , reason      TEXT
-  , expires     INTEGER
-  , FOREIGN KEY (executor_id) REFERENCES player(id)
-  , FOREIGN KEY (asn) REFERENCES asn(asn)
-  , FOREIGN KEY (status_id) REFERENCES asn_status(id)
-);
-  CREATE INDEX IF NOT EXISTS asn_action_log_asn       ON asn_action_log(asn);
-  CREATE INDEX IF NOT EXISTS asn_action_log_timestamp ON asn_action_log(timestamp);
-  CREATE INDEX IF NOT EXISTS asn_action_log_reason    ON asn_action_log(reason);
--- END ASN
--- OTHER
-CREATE TABLE IF NOT EXISTS log (
-    player_id INTEGER NOT NULL
-  , ip        INTEGER NOT NULL
-  , asn       INTEGER NOT NULL
-  , success   INTEGER NOT NULL
-  , timestamp INTEGER NOT NULL
-  , FOREIGN KEY (player_id) REFERENCES player(id)
-  , FOREIGN KEY (ip)        REFERENCES ip(ip)
-  , FOREIGN KEY (asn)       REFERENCES asn(asn)
-);
-  CREATE INDEX IF NOT EXISTS log_player    ON log(player_id);
-  CREATE INDEX IF NOT EXISTS log_ip        ON log(ip);
-  CREATE INDEX IF NOT EXISTS log_asn       ON log(asn);
-  CREATE INDEX IF NOT EXISTS log_timestamp ON log(timestamp);
-
-CREATE TABLE IF NOT EXISTS assoc (
-    player_id INTEGER
-  , ip        INTEGER
-  , asn       INTEGER
-  , PRIMARY KEY (player_id, ip, asn)
-  , FOREIGN KEY (player_id) REFERENCES player(id)
-  , FOREIGN KEY (ip)        REFERENCES ip(ip)
-  , FOREIGN KEY (asn)       REFERENCES asn(asn)
-);
-  CREATE        INDEX IF NOT EXISTS assoc_player ON assoc(player_id);
-  CREATE        INDEX IF NOT EXISTS assoc_ip     ON assoc(ip);
-  CREATE        INDEX IF NOT EXISTS assoc_asn    ON assoc(asn);
--- END OTHER
-PRAGMA foreign_keys = ON;
-    ]])
+    local schema = load_file(verbana.modpath .. '/schema.sql')
+    local ret_code = db_exec(schema)
+    if ret_code ~= sql.OK then
+        error(('Verbana failed to initialize the database: %s'):format(db:error_message()))
+    end
 end -- init_db()
 
 init_db()
+
+function verbana.data.import_from_sban(filename)
+    local sban_db, _, errormsg = sql.open(filename, sql.OPEN_READONLY)
+    if not sban_db then
+        return false, ('Error opening %s: %s'):format(filename, errormsg)
+    end
+
+    local player_data = get_full_table([[
+        SELECT id, name, ip, created, last_login FROM playerdata
+    ]])
+    local bans_data = get_full_table([[
+        SELECT id, name, source, created, reason, expires, u_source, u_reason, u_date, active, last_pos FROM bans
+    ]])
+
+    sban_db.close()
+end
 
 function verbana.data.get_player_id(name) end
 function verbana.data.get_player_status(player_id) return {} end

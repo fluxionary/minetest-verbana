@@ -1,25 +1,17 @@
 if not verbana then verbana = {} end
 if not verbana.modpath then verbana.modpath = '.' end
-if not verbana.ip then dofile(verbana.modpath .. '/ipmanip.lua') end
+if not verbana.ip then dofile(verbana.modpath .. '/lib_ip.lua') end
 if not verbana.log then function verbana.log(_, message, ...) print(message:format(...)) end end
 verbana.asn = {}
 
 local ASN_DESCRIPTION_FILE = 'data-used-autnums'
 local NETWORK_ASN_FILE = 'data-raw-table'
 
-local function load_file(filename)
-    local file = io.open(('%s/%s'):format(verbana.modpath, filename), 'r')
-    if not file then
-        verbana.log('error', 'error opening "%s"', filename)
-        return
-    end
-    local contents = file:read('*a')
-    file:close()
-    return contents
-end
+local load_file = verbana.util.load_file
 
 local function refresh_asn_descriptions()
     local contents = load_file(ASN_DESCRIPTION_FILE)
+    if not contents then return end
     local description = {}
 
     for line in contents:gmatch('[^\r\n]+') do
@@ -33,10 +25,12 @@ local function refresh_asn_descriptions()
     end
 
     verbana.asn.description = description
+    return true
 end
 
 local function refresh_asn_table()
     local contents = load_file(NETWORK_ASN_FILE)
+    if not contents then return end
 
     local networks = {}
     for line in contents:gmatch('[^\r\n]+') do
@@ -79,17 +73,21 @@ local function refresh_asn_table()
     end
 
     verbana.asn.network = networks
+    return true
 end
 
 function verbana.asn.refresh()
     local start = os.clock()
-    refresh_asn_descriptions()
-    refresh_asn_table()
+    if not refresh_asn_descriptions() then return end
+    if not refresh_asn_table() then return end
 
     verbana.log('action', 'refreshed ASN tables in %s seconds', os.clock() - start)
+    return true
 end
 
-verbana.asn.refresh()
+if not verbana.asn.refresh() then
+    error('Verbana could not load ASN data')
+end
 
 local function find(ipint)
     local t = verbana.asn.network

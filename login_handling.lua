@@ -1,7 +1,6 @@
-local function table_size(t)
-    local count = 0
-    for _ in pairs(t) do count = count + 1 end
-    return count
+local function table_is_empty(t)
+    for _ in pairs(t) do return false end
+    return true
 end
 
 minetest.register_on_prejoinplayer(function(name, ipstr)
@@ -40,7 +39,7 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
     end
 
     local player_privs = minetest.get_player_privs(name)
-    local is_new_player = table_size(player_privs) == 0
+    local is_new_player = table_is_empty(player_privs)
 
     local suspicious = false
     local return_value
@@ -64,16 +63,12 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
             return_value = ('Account %q is locked.'):format(name)
         end
     elseif player_status.name == 'tempbanned' then
-        local expires = player_status.expires or now
+        local expires = os.date("%c", player_status.expires or now)
         local reason = player_status.reason
         if reason and reason ~= '' then
-            return_value = ('Account %q is banned until %s because %q.'):format(
-                name, os.date("%c", expires), reason
-            )
+            return_value = ('Account %q is banned until %s because %q.'):format(name, expires, reason)
         else
-            return_value = ('Account %q is banned until %s.'):format(
-                name, os.date("%c", expires)
-            )
+            return_value = ('Account %q is banned until %s.'):format(name, expires)
         end
     elseif ip_status.name == 'trusted' then
         -- let them in
@@ -87,16 +82,12 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
             return_value = ('IP %q is blocked.'):format(ipstr)
         end
     elseif ip_status.name == 'tempblocked' then
-        local expires = ip_status.expires or now
+        local expires = os.date("%c", ip_status.expires or now)
         local reason = ip_status.reason
         if reason and reason ~= '' then
-            return_value = ('IP %q is blocked until %s because %q.'):format(
-                ipstr, os.date("%c", expires), reason
-            )
+            return_value = ('IP %q is blocked until %s because %q.'):format(ipstr, expires, reason)
         else
-            return_value = ('IP %q is blocked until %s.'):format(
-                ipstr, os.date("%c", expires)
-            )
+            return_value = ('IP %q is blocked until %s.'):format(ipstr, expires)
         end
     elseif asn_status.name == 'suspicious' then
         suspicious = true
@@ -108,16 +99,14 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
             return_value = ('Network %s (%s) is blocked.'):format(asn, asn_description)
         end
     elseif asn_status.name == 'tempblocked' then
-        local expires = ip_status.expires or now
-        local reason = ip_status.reason
+        local expires = os.date("%c", asn_status.expires or now)
+        local reason = asn_status.reason
         if reason and reason ~= '' then
             return_value = ('Network %s (%s) is blocked until %s because %q.'):format(
-                asn, asn_description, os.date("%c", expires), reason
+                asn, asn_description, expires, reason
             )
         else
-            return_value = ('Network %s (%s) is blocked until %s.'):format(
-                asn, asn_description, os.date("%c", expires)
-            )
+            return_value = ('Network %s (%s) is blocked until %s.'):format(asn, asn_description, expires)
         end
     end
 

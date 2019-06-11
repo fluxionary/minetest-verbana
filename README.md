@@ -1,6 +1,8 @@
 Verbana: Verification and banning mod for minetest
 ==================================================
 
+CURRENTLY A NON-FUNCTIONAL WIP. DO NOT USE UNTIL THIS MESSAGE HAS BEEN REMOVED.
+
 Name
 ----
 A portmanteau of "verification", "ban", and the herb verbena.
@@ -46,3 +48,18 @@ blocking and verification.
    personal details may be kept private. However, operators may execute queries-
    to determine if a player is associated with other banned players by IP or
    network.
+
+Some features of sban that the first release of Verbana will likely lack:
+* A GUI. The sban GUI does not work particularly well anyway, and I don't know formspec. Use commands.
+* Import/export from various other ban formats. I plan to import data from sban, but I don't have a use case for the rest.
+
+Requirements
+============
+
+* Verbana must be listed as a trusted mod in minetest.conf (`secure.trusted_mods`)
+* lsqlite3 (SQLite3 for Lua) must be installed and accessible to minetest's Lua.
+ * The easiest way I know how to do this: install luarocks, and execute `sudo luarocks --lua-version 5.1 install lsqlite3`
+* The minetest server must use IPv4 exclusively. I've made zero attempt to support IPv6.
+
+
+

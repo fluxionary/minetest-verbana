@@ -1,1 +1,5 @@
 .idea/
+/data-raw-table
+/data-used-autnums
+*.sqlite
+*.sqlite3

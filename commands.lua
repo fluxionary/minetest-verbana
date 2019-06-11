@@ -1,30 +1,45 @@
+verbana.commands = {}
+
 local mod_priv = verbana.privs.moderator
 local admin_priv = verbana.privs.admin
+
+function verbana.commands.import_sban(filename)
+    verbana.data.import_from_sban(filename)
+    return false, 'TODO: implement'
+end
 
 minetest.register_chatcommand('import_sban', {
     params='<filename>',
     description='import records from sban',
     privs={[admin_priv]=true},
-    func=function(caller, params)
-        return false, 'TODO: implement'
-    end
+    func=import_sban
 })
 
 minetest.register_chatcommand('get_asn', {
     params='<name> | <IP>',
     description='get the ASN associated with an IP or player name',
     privs={[mod_priv]=true},
-    func = function(caller, ipstr)
-        if not verbana.ip.is_valid_ip(ipstr) then
-            -- TODO assume its a player?
-            return false, ('"%s" is not a valid ip'):format(ipstr)
+    func = function(caller, name_or_ipstr)
+        local ipstr
+
+        if verbana.ip.is_valid_ip(name_or_ipstr) then
+            ipstr = name_or_ipstr
+        else
+            ipstr = minetest.get_player_ip(name_or_ipstr)
         end
+
+        if not ipstr then
+            return false, ('"%s" is not a valid ip nor a connected player'):format(name_or_ipstr)
+        end
+
         local asn, description = verbana.asn.lookup(ipstr)
         if not asn then
             return false, ('could not find ASN for "%s"'):format(ipstr)
         end
+
         description = description or ''
-        return true, ('A%u %s'):format(asn, description)
+
+        return true, ('A%u (%s)'):format(asn, description)
     end
 })
 
