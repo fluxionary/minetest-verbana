@@ -10,7 +10,7 @@ local NETWORK_ASN_FILE = 'data-raw-table'
 local load_file = verbana.util.load_file
 
 local function refresh_asn_descriptions()
-    local contents = load_file(ASN_DESCRIPTION_FILE)
+    local contents = load_file(('%s/%s'):format(verbana.modpath, ASN_DESCRIPTION_FILE))
     if not contents then return end
     local description = {}
 
@@ -29,7 +29,7 @@ local function refresh_asn_descriptions()
 end
 
 local function refresh_asn_table()
-    local contents = load_file(NETWORK_ASN_FILE)
+    local contents = load_file(('%s/%s'):format(verbana.modpath, NETWORK_ASN_FILE))
     if not contents then return end
 
     local networks = {}
@@ -95,7 +95,7 @@ local function find(ipint)
     local high = #t
     while low <= high do
         local mid = math.floor((low + high) / 2)
-        verbana.log('action', '%s %s %s %s %s', ipint, low, mid, high, #t)
+        -- verbana.log('action', '%s %s %s %s %s', ipint, low, mid, high, #t)
         local element = t[mid]
         local start = element[1]
         local end_ = element[2]
@@ -121,6 +121,6 @@ function verbana.asn.lookup(ipstr)
     if asn then
         return asn, verbana.asn.description[asn]
     else
-        return nil, nil
+        return 0, 'IP not associated with a known ASN'
     end
 end

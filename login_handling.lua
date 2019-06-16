@@ -9,10 +9,10 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
     local ipint = verbana.ip.ipstr_to_number(ipstr)
     local asn, asn_description = verbana.asn.lookup(ipint)
 
-    local player_id = verbana.data.get_player_id(name)
-    local player_status = verbana.data.get_player_status(player_id)
-    local ip_status = verbana.data.get_ip_status(ipint)
-    local asn_status = verbana.data.get_asn_status(asn)
+    local player_id = verbana.data.get_player_id(name, true) -- will create one if none exists
+    local player_status = verbana.data.get_player_status(player_id, true)
+    local ip_status = verbana.data.get_ip_status(ipint, true) -- will create one if none exists
+    local asn_status = verbana.data.get_asn_status(asn, true) -- will create one if none exists
 
     -- check and clear temporary statuses
     local now = os.time()
@@ -39,7 +39,7 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
     end
 
     local player_privs = minetest.get_player_privs(name)
-    local is_new_player = table_is_empty(player_privs)
+    local is_new_player = table_is_empty(player_privs) and player_status.name == 'unknown'
 
     local suspicious = false
     local return_value
@@ -164,7 +164,11 @@ minetest.register_on_newplayer(function(player)
     )
 
     if need_to_verify then
-        verbana.data.unverify_player(player_id, 1, 'new player connected from suspicious network')
+        verbana.data.unverify_player(
+            player_id,
+            verbana.data.verbana_player_id,
+            'new player connected from suspicious network'
+        )
         minetest.set_player_privs(name, verbana.settings.unverified_privs)
         player:set_pos(verbana.settings.verification_pos)
         -- wait a second before moving the player to the verification area
@@ -172,6 +176,12 @@ minetest.register_on_newplayer(function(player)
         minetest.after(1, function() move_to(name, verbana.settings.verification_pos) end)
         verbana.log('action', 'new player %s sent to verification', name)
     else
+        verbana.data.set_player_status(
+            player_id,
+            verbana.data.verbana_player_id,
+            verbana.data.player_status_id.default,
+            'new player'
+        )
         verbana.log('action', 'new player %s', name)
     end
 end)

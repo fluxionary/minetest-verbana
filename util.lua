@@ -1,7 +1,7 @@
 verbana.util = {}
 
 function verbana.util.load_file(filename)
-    local file = io.open(('%s/%s'):format(verbana.modpath, filename), 'r')
+    local file = io.open(filename, 'r')
     if not file then
         verbana.log('error', 'error opening "%s"', filename)
         return

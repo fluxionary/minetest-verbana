@@ -4,11 +4,11 @@ verbana.ip = {}
 
 function verbana.ip.is_valid_ip(ipstr)
     local a, b, c, d = ipstr:match('^(%d+)%.(%d+)%.(%d+)%.(%d+)$')
-    if not a and b and c and d then return false end
     a = tonumber(a)
     b = tonumber(b)
     c = tonumber(c)
     d = tonumber(d)
+    if not (a and b and c and d) then return false end
     return 0 <= a and a < 256 and 0 <= b and b < 256 and 0 <= c and c < 256 and 0 <= d and d < 256
 end
 
