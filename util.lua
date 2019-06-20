@@ -16,3 +16,20 @@ function verbana.util.table_invert(t)
     for k,v in pairs(t) do inverted[v] = k end
     return inverted
 end
+
+function verbana.util.table_reversed(t)
+    local len = #t
+    local reversed = {}
+    for i = len,1,-1 do
+        reversed[len - i + 1] = t[i]
+    end
+    return reversed
+end
+
+function verbana.util.table_contains(t, value)
+    for _, v in ipairs(t) do
+        if v == value then return true end
+    end
+    return false
+end
+

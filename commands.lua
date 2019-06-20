@@ -49,21 +49,104 @@ minetest.register_chatcommand('get_asn', {
     end
 })
 
+local function parse_status_params(params)
+    local name, reason = params:match('^([a-zA-Z0-9_-]+)%s+(.*)$')
+    if not name then
+        name = params:match('^([a-zA-Z0-9_-]+)$')
+    end
+    if not name or name:len() > 20 then
+        return nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+    end
+    local player_id = verbana.data.get_player_id(name)
+    if not player_id then
+        return nil, nil, nil, ('Unknown player: %s'):format(name)
+    end
+    local player_status = verbana.data.get_player_status(player_id, true)
+    return player_id, name, player_status, reason
+end
+
+local function has_suspicious_connection(player_name)
+    local connection_log = verbana.data.get_player_connection_log(player_name, 1)
+    if not connection_log or #connection_log ~= 1 then
+        verbana.log('warning', 'player %s exists but has no connection log?', player_name)
+        return true
+    end
+    local last_login = connection_log[1]
+    if last_login.ip_status_id == verbana.data.ip_status.trusted.id then
+        return false
+    elseif last_login.ip_status_id ~= verbana.data.ip_status.default.id then
+        return true
+    elseif last_login.asn_status_id == verbana.data.asn_status.default.id then
+        return false
+    end
+    return true
+end
+
 minetest.register_chatcommand('verify', {
-    params='<name>',
+    params='<name> [<reason>]',
     description='verify a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
+        if player_status.status_id ~= verbana.data.player_status.unverified.id then
+            return false, ('Player %s is not unverified'):format(player_name)
+        end
+        local executor_id = verbana.data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        local status_id
+        if has_suspicious_connection(player_name) then
+            status_id = verbana.data.player_status.suspicious.id
+        else
+            status_id = verbana.data.player_status.default.id
+        end
+        if not verbana.data.set_player_status(player_id, executor_id, status_id, reason) then
+            return false, 'ERROR setting player status'
+        end
+        minetest.set_player_privs(player_name, verbana.settings.verified_privs)
+        local player = minetest.get_player_by_name(player_name)
+        if player then
+            player:set_pos(verbana.settings.spawn_pos)
+        else
+            -- TODO: set up some way to TP the player to spawn when they log in
+        end
+        return true, ('Verified %s'):format(player_name)
     end
 })
 
 minetest.register_chatcommand('unverify', {
-    params='<name>',
+    params='<name> [<reason>]',
     description='unverify a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                verbana.data.player_status.unknown,
+                verbana.data.player_status.default,
+                verbana.data.player_status.suspicious,
+            }, player_status.status_id) then
+            return false, ('Cannot unverify %s w/ status %s'):format(player_name, verbana.data.player_status[player_status.status_id].name)
+        end
+        local executor_id = verbana.data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not verbana.data.set_player_status(player_id, executor_id, verbana.data.player_status.unverified.id, reason) then
+            return false, 'ERROR setting player status'
+        end
+        minetest.set_player_privs(player_name, verbana.settings.unverified_privs)
+        local player = minetest.get_player_by_name(player_name)
+        if player then
+            player:set_pos(verbana.settings.verification_pos)
+        end
+        return true, ('Unverified %s'):format(player_name)
     end
 })
 
@@ -72,6 +155,10 @@ minetest.override_chatcommand('kick', {
     description='kick a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -81,6 +168,10 @@ minetest.register_chatcommand('lock', {
     description='lock a player\'s account',
     privs={[mod_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -90,6 +181,10 @@ minetest.register_chatcommand('unlock', {
     description='unlock a player\'s account',
     privs={[mod_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -99,6 +194,10 @@ minetest.override_chatcommand('ban', {
     description='ban a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         -- todo: make sure that the begining of 'reason' doesn't look like a timespan =b
         return false, 'TODO: implement'  -- TODO
     end
@@ -118,6 +217,10 @@ minetest.override_chatcommand('unban', {
     description='unban a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -127,6 +230,10 @@ minetest.register_chatcommand('whitelist', {
     description='whitelist a player',
     privs={[admin_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -136,6 +243,10 @@ minetest.register_chatcommand('unwhitelist', {
     description='whitelist a player',
     privs={[admin_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -145,6 +256,10 @@ minetest.register_chatcommand('suspect', {
     description='mark a player as suspicious',
     privs={[mod_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -154,6 +269,10 @@ minetest.register_chatcommand('unsuspect', {
     description='unmark a player as suspicious',
     privs={[mod_priv]=true},
     func=function(caller, params)
+        local player_id, player_name, player_status, reason = parse_status_params(params)
+        if not player_id then
+            return false, reason
+        end
         return false, 'TODO: implement'  -- TODO
     end
 })
@@ -170,46 +289,47 @@ minetest.register_chatcommand('ban_record', {
                 return false, 'invalid arguments'
             end
         end
-
-        local rows = verbana.data.get_ban_record(name)
-        if not rows then
-            return false, 'An error occurred (see server logs)'
-        end
-
-        if #rows == 0 then
-            return true, 'No records found.'
-        end
-
-        local starti
-        if numberstr then
-            local number = tonumber(numberstr)
-            starti = math.max(1, #rows - number)
-        else
-            starti = 1
-        end
-
-        for index = starti,#rows do
-            local row = rows[index]
-            local executor = row[1]
-            local status = row[2]
-            local timestamp = os.date("%c", row[3])
-            local reason = row[4]
-            local expires
-            if row[5] then
-                expires = os.date("%c", row[5])
-            end
-            local message = ('%s: %s set status to %s.'):format(timestamp, executor, status)
-            if reason and reason ~= '' then
-                message = ('%s Reason: %s'):format(message, reason)
-            end
-            if expires then
-                message = ('%s Expires: %s'):format(message, expires)
-            end
-
-            minetest.chat_send_player(caller, message)
-        end
-
-        return true
+        -- TODO: there is no more "ban record" command, just "player status log"
+--
+--        local rows = verbana.data.get_ban_record(name)
+--        if not rows then
+--            return false, 'An error occurred (see server logs)'
+--        end
+--
+--        if #rows == 0 then
+--            return true, 'No records found.'
+--        end
+--
+--        local starti
+--        if numberstr then
+--            local number = tonumber(numberstr)
+--            starti = math.max(1, #rows - number)
+--        else
+--            starti = 1
+--        end
+--
+--        for index = starti,#rows do
+--            local row = rows[index]
+--            local executor = row[1]
+--            local status = row[2]
+--            local timestamp = os.date("%c", row[3])
+--            local reason = row[4]
+--            local expires
+--            if row[5] then
+--                expires = os.date("%c", row[5])
+--            end
+--            local message = ('%s: %s set status to %s.'):format(timestamp, executor, status)
+--            if reason and reason ~= '' then
+--                message = ('%s Reason: %s'):format(message, reason)
+--            end
+--            if expires then
+--                message = ('%s Expires: %s'):format(message, expires)
+--            end
+--
+--            minetest.chat_send_player(caller, message)
+--        end
+--
+--        return true
     end
 })
 

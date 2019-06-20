@@ -117,7 +117,7 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
         local has_assoc = verbana.data.has_asn_assoc(player_id, asn) or verbana.data.has_ip_assoc(player_id, ipint)
         if not has_assoc then
             -- note: if 'suspicious' is true, then 'return_value' should be nil before this
-            return_value = ('Suspicious activity detected; connection denied.'):format()
+            return_value = 'Suspicious activity detected.'
         end
     end
 
@@ -179,7 +179,7 @@ minetest.register_on_newplayer(function(player)
         verbana.data.set_player_status(
             player_id,
             verbana.data.verbana_player_id,
-            verbana.data.player_status_id.default,
+            verbana.data.player_status.default.id,
             'new player'
         )
         verbana.log('action', 'new player %s', name)
@@ -195,3 +195,35 @@ minetest.register_on_joinplayer(function(player)
         verbana.chat.tell_mods(('*** Player %s from A%s (%s) is unverified.'):format(name, asn, asn_description))
     end
 end)
+
+if verbana.settings.verification_jail and verbana.settings.verification_jail_period then
+    local timer = 0
+    local verification_jail = verbana.settings.verification_jail
+    local check_player_privs = minetest.check_player_privs
+    local function should_rejail(player)
+        local name = player:get_player_name()
+        if not check_player_privs(name, {unverified = true}) then
+            return false
+        end
+        local pos = player:get_pos()
+        return not (
+            verification_jail.x[1] <= pos.x and pos.x <= verification_jail.x[2] and
+            verification_jail.y[1] <= pos.y and pos.y <= verification_jail.y[2] and
+            verification_jail.z[1] <= pos.z and pos.z <= verification_jail.z[2]
+        )
+    end
+    local verification_pos = verbana.settings.verification_pos
+    local verification_jail_period = verbana.settings.verification_jail_period
+    minetest.register_globalstep(function(dtime)
+        timer = timer + dtime;
+        if timer < verification_jail_period then
+            return
+        end
+        timer = 0
+        for _, player in ipairs(minetest.get_connected_players()) do
+            if should_rejail(player) then
+                player:set_pos(verification_pos)
+            end
+        end
+    end)
+end
