@@ -5,16 +5,6 @@ CREATE TABLE IF NOT EXISTS player_status (
   , name TEXT NOT NULL
 );
   CREATE INDEX IF NOT EXISTS player_status_name ON player_status(name);
-  INSERT OR IGNORE INTO player_status
-         (id, name)
-  VALUES ( 1, 'unknown')
-       , ( 2, 'default')
-       , ( 3, 'unverified')
-       , ( 4, 'banned')
-       , ( 5, 'tempbanned')
-       , ( 6, 'locked')
-       , ( 7, 'whitelisted')
-       , ( 8, 'suspicious');
 
 CREATE TABLE IF NOT EXISTS player (
     id             INTEGER PRIMARY KEY AUTOINCREMENT
@@ -24,10 +14,9 @@ CREATE TABLE IF NOT EXISTS player (
   , FOREIGN KEY (main_player_id) REFERENCES player(id)
   , FOREIGN KEY (current_status_id) REFERENCES player_status_log(id)
 );
-  CREATE UNIQUE INDEX IF NOT EXISTS player_name ON player(name);
+  CREATE UNIQUE INDEX IF NOT EXISTS player_name ON player(LOWER(name));
   CREATE INDEX IF NOT EXISTS player_main_player_id ON player(main_player_id);
   CREATE INDEX IF NOT EXISTS player_current_status_id ON player(current_status_id);
-  INSERT OR IGNORE INTO player (name) VALUES ('!verbana!');
 
 CREATE TABLE IF NOT EXISTS player_status_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT
@@ -52,13 +41,6 @@ CREATE TABLE IF NOT EXISTS ip_status (
   , name TEXT NOT NULL
 );
   CREATE INDEX IF NOT EXISTS ip_status_name ON ip_status(name);
-  INSERT OR IGNORE INTO ip_status
-         (id, name)
-  VALUES ( 1, 'default')
-       , ( 2, 'trusted')
-       , ( 3, 'suspicious')
-       , ( 4, 'blocked')
-       , ( 5, 'tempblocked');
 
 CREATE TABLE IF NOT EXISTS ip (
     ip             INTEGER PRIMARY KEY
@@ -89,12 +71,6 @@ CREATE TABLE IF NOT EXISTS asn_status (
   , name TEXT NOT NULL
 );
   CREATE INDEX IF NOT EXISTS asn_status_name ON asn_status(name);
-  INSERT OR IGNORE INTO asn_status
-         (id, name)
-  VALUES ( 1, 'default')
-       , ( 2, 'suspicious')
-       , ( 3, 'blocked')
-       , ( 4, 'tempblocked');
 
 CREATE TABLE IF NOT EXISTS asn (
     asn       INTEGER PRIMARY KEY
@@ -119,7 +95,7 @@ CREATE TABLE IF NOT EXISTS asn_status_log (
   CREATE INDEX IF NOT EXISTS asn_status_log_timestamp ON asn_status_log(timestamp);
   CREATE INDEX IF NOT EXISTS asn_status_log_reason    ON asn_status_log(reason);
 -- END ASN
--- OTHER
+-- LOGS AND ASSOCIATIONS
 CREATE TABLE IF NOT EXISTS connection_log (
     player_id INTEGER NOT NULL
   , ip        INTEGER NOT NULL
@@ -137,9 +113,11 @@ CREATE TABLE IF NOT EXISTS connection_log (
   CREATE INDEX IF NOT EXISTS log_timestamp ON connection_log(timestamp);
 
 CREATE TABLE IF NOT EXISTS assoc (
-    player_id INTEGER
-  , ip        INTEGER
-  , asn       INTEGER
+    player_id  INTEGER NOT NULL
+  , ip         INTEGER NOT NULL
+  , asn        INTEGER NOT NULL
+  , first_seen INTEGER NOT NULL
+  , last_seen  INTEGER NOT NULL
   , PRIMARY KEY (player_id, ip, asn)
   , FOREIGN KEY (player_id) REFERENCES player(id)
   , FOREIGN KEY (ip)        REFERENCES ip(ip)
@@ -148,5 +126,5 @@ CREATE TABLE IF NOT EXISTS assoc (
   CREATE        INDEX IF NOT EXISTS assoc_player ON assoc(player_id);
   CREATE        INDEX IF NOT EXISTS assoc_ip     ON assoc(ip);
   CREATE        INDEX IF NOT EXISTS assoc_asn    ON assoc(asn);
--- END OTHER
+-- END LOGS AND ASSOCIATIONS
 PRAGMA foreign_keys = ON;

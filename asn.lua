@@ -115,7 +115,7 @@ function verbana.asn.lookup(ipstr)
     if type(ipstr) == 'number' then
         ipint = ipstr
     else
-        ipint = verbana.ip.ipstr_to_number(ipstr)
+        ipint = verbana.ip.ipstr_to_ipint(ipstr)
     end
     local asn = find(ipint)
     if asn then
@@ -123,4 +123,8 @@ function verbana.asn.lookup(ipstr)
     else
         return 0, 'IP not associated with a known ASN'
     end
+end
+
+function verbana.asn.get_description(asn)
+    return verbana.asn.description[asn] or 'IP not associated with a known ASN'
 end
