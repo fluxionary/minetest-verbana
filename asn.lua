@@ -9,6 +9,9 @@ local NETWORK_ASN_FILE = 'data-raw-table'
 
 local load_file = verbana.util.load_file
 
+-- map from ASN (integer) to description (string)
+verbana.asn.description = {}
+
 local function refresh_asn_descriptions()
     local contents = load_file(('%s/%s'):format(verbana.modpath, ASN_DESCRIPTION_FILE))
     if not contents then return end
@@ -27,6 +30,10 @@ local function refresh_asn_descriptions()
     verbana.asn.description = description
     return true
 end
+
+-- array of values like {starting_ip (integer), ending_ip (integer), ASN (integer)}
+-- ip ranges should be sorted and not overlap.
+verbana.asn.network = {}
 
 local function refresh_asn_table()
     local contents = load_file(('%s/%s'):format(verbana.modpath, NETWORK_ASN_FILE))
@@ -78,8 +85,8 @@ end
 
 function verbana.asn.refresh()
     local start = os.clock()
-    if not refresh_asn_descriptions() then return end
-    if not refresh_asn_table() then return end
+    if not refresh_asn_descriptions() then return false end
+    if not refresh_asn_table() then return false end
 
     verbana.log('action', 'refreshed ASN tables in %s seconds', os.clock() - start)
     return true
@@ -90,12 +97,14 @@ if not verbana.asn.refresh() then
 end
 
 local function find(ipint)
+    -- binary search
+    -- TODO we could possibly weight the "middle" based in where ipint falls in [0,2**32).
+    -- TODO see e.g. https://en.wikipedia.org/wiki/Interpolation_search
     local t = verbana.asn.network
     local low = 1
     local high = #t
     while low <= high do
         local mid = math.floor((low + high) / 2)
-        -- verbana.log('action', '%s %s %s %s %s', ipint, low, mid, high, #t)
         local element = t[mid]
         local start = element[1]
         local end_ = element[2]
@@ -108,6 +117,7 @@ local function find(ipint)
             low = mid + 1
         end
     end
+    -- not found, return nil
 end
 
 function verbana.asn.lookup(ipstr)
@@ -119,12 +129,12 @@ function verbana.asn.lookup(ipstr)
     end
     local asn = find(ipint)
     if asn then
-        return asn, verbana.asn.description[asn]
+        return asn, (verbana.asn.description[asn] or 'Not a known ASN')
     else
-        return 0, 'IP not associated with a known ASN'
+        return 0, 'Not a known ASN'
     end
 end
 
 function verbana.asn.get_description(asn)
-    return verbana.asn.description[asn] or 'IP not associated with a known ASN'
+    return verbana.asn.description[asn] or 'Not a known ASN'
 end
