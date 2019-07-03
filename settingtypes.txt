@@ -1,0 +1,28 @@
+# The privilege of the Verbana adminstrator(s)
+verbana.admin_priv (Priv required for Verbana administration) string ban_admin
+
+# The privilege of the Verbana moderator(s)
+verbana.moderator_priv (Priv required for Verbana moderation) string basic_privs
+
+# Comma delimited
+verbana.unverified_privs (Privs for unverified users) string shout
+
+# Comma delimited. If a player has all of the listed privileges, they skip suspicious network checks.
+verbana.privs_to_whitelist (Privs required to bypass suspicious network checks) string
+
+# Coordinates where unverified players spawn
+verbana.unverified_spawn_pos (Where unverified players spawn) string 0,0,0
+
+# Coordinates bounding the verification jail area, if it exists.
+# Format: x1,x2,y1,y2,z1,z2
+verbana.jail_bounds (Bounding box of the verification jail) string
+
+# Period between checks that unverified players haven't escaped the verification area
+verbana.jail_check_period (Timespan between checks for verification jail escapees) int
+
+# If enabled, all new users must be verified. Otherwise, only players from suspicious networks.
+verbana.universal_verification (Enable verification for all new users) bool false
+
+# In debug mode, Verbana will not block any players from connecting, change their privileges,
+# or anything else that affects gameplay.
+verbana.debug_mode (Whether to run verbana in debug mode) bool true

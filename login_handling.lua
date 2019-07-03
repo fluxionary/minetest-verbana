@@ -9,12 +9,11 @@ local timer = 0
 local verification_jail = verbana.settings.verification_jail
 local check_player_privs = minetest.check_player_privs
 local spawn_pos = verbana.settings.spawn_pos
-local verification_pos = verbana.settings.verification_pos
+local unverified_spawn_pos = verbana.settings.unverified_spawn_pos
 local verification_jail_period = verbana.settings.verification_jail_period
 
-local function should_rejail(player)
-    local name = player:get_player_name()
-    if not check_player_privs(name, {unverified = true}) then
+local function should_rejail(player, player_status)
+    if player_status.status_id ~= verbana.data.player_status.unverified.id then
         return false
     end
     local pos = player:get_pos()
@@ -25,11 +24,13 @@ local function should_rejail(player)
     )
 end
 
-local function should_unjail(player)
-    local name = player:get_player_name()
-    if check_player_privs(name, {unverified = true}) then
+local function should_unjail(player, player_status)
+    if player_status.status_id == verbana.data.player_status.unverified.id then
+        return false
+    elseif verbana.privs.is_privileged(player:get_player_name()) then
         return false
     end
+
     local pos = player:get_pos()
     return (
         verification_jail.x[1] <= pos.x and pos.x <= verification_jail.x[2] and
@@ -46,8 +47,14 @@ if USING_VERIFICATION_JAIL then
         end
         timer = 0
         for _, player in ipairs(minetest.get_connected_players()) do
-            if should_rejail(player) then
-                player:set_pos(verification_pos)
+            -- TODO this is pretty heavy
+            local name = player:get_player_name()
+            local player_id = verbana.data.get_player_id(name)
+            local player_status = verbana.data.get_player_status(player_id)
+            if should_rejail(player, player_status) then
+                player:set_pos(unverified_spawn_pos)
+            elseif should_unjail(player, player_status) then
+                player:set_pos(spawn_pos)
             end
         end
     end)
@@ -218,10 +225,10 @@ minetest.register_on_newplayer(function(player)
             verbana.log('error', 'error setting unverified status on %s', name)
         end
         minetest.set_player_privs(name, verbana.settings.unverified_privs)
-        player:set_pos(verbana.settings.verification_pos)
+        player:set_pos(unverified_spawn_pos)
         -- wait a second before moving the player to the verification area
         -- because other mods sometimes try to move them around as well
-        minetest.after(1, function() move_to(name, verbana.settings.verification_pos) end)
+        minetest.after(1, function() move_to(name, unverified_spawn_pos) end)
         verbana.log('action', 'new player %s sent to verification', name)
     else
         verbana.data.set_player_status(
@@ -243,11 +250,18 @@ minetest.register_on_joinplayer(function(player)
         verbana.chat.tell_mods(('*** Player %s from A%s (%s) is unverified.'):format(name, asn, asn_description))
     end
     if USING_VERIFICATION_JAIL then
-        if should_rejail(player) then
-            player:set_pos(verification_pos)
-        elseif should_unjail(player) then
+        local player_id = verbana.data.get_player_id(name)
+        local player_status = verbana.data.get_player_status(player_id)
+
+        if should_rejail(player, player_status) then
+            player:set_pos(unverified_spawn_pos)
+        elseif should_unjail(player, player_status) then
             player:set_pos(spawn_pos)
         end
     end
 end)
 
+
+minetest.register_on_auth_fail(function(name, ip)
+    -- TODO log failure
+end)

@@ -1,24 +1,21 @@
 verbana.settings = {}
--- config: privs_to_whitelist: if a player has this/these privs, they are treated as whitelisted
-local function settings_get_set(name, default)
-    -- "set" here is as in a "set of items"
-    local value = minetest.settings:get(name)
-    if value then
-        local set = {}
-        -- TODO split the value on commas etc
-    else
-        return default
+
+local settings = minetest.settings
+
+local function get_jail_bounds()
+    local bounds = settings:get('verbana.jail_bounds')
+    if not bounds or bounds == '' then
+        return nil
     end
+
 end
 
--- TODO load priv settings
+verbana.settings.verified_privs = minetest.string_to_privs(settings:get('default_privs') or '')
+verbana.settings.unverified_privs = minetest.string_to_privs(settings:get('verbana.unverified_privs') or '')
+verbana.settings.privs_to_whitelist = minetest.string_to_privs(settings:get('verbana.privs_to_whitelist') or '')
+verbana.settings.universal_verification = settings:get_bool('verbana.universal_verification', false)
 
-verbana.settings.verified_privs = ...
-verbana.settings.unverified_privs = settings_get_set('...', {unverified = true, shout = true})
-verbana.settings.privs_to_whitelist = nil
-verbana.settings.universal_verification = false -- TODO this should be loaded from mod_storage?
-
-verbana.settings.spawn_pos = {x = 111, y = 13, z = -507} -- TODO this should be grabbed from the spawn mod
-verbana.settings.verification_pos = {x = 172, y = 29, z = -477} -- TODO load from config
-verbana.settings.verification_jail = {x={159, 184}, y={27, 36}, z={-493, -472}}
-verbana.settings.verification_jail_period = nil
+verbana.settings.spawn_pos = minetest.string_to_pos(settings:get('static_spawnpoint') or '(0,0,0)')
+verbana.settings.unverified_spawn_pos = minetest.string_to_pos(settings:get('verbana.unverified_spawn_pos') or '(0,0,0)')
+verbana.settings.jail_bounds = get_jail_bounds()
+verbana.settings.jail_check_period = settings:get('static_spawnpoint')

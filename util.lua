@@ -51,3 +51,12 @@ function verbana.util.parse_time(text)
     end
     return n * time_units[unit]
 end
+
+--function verbana.util.string_split(str, delim)
+--    if not str:find(delim) then return {str} end
+--    local bits = {}
+--    while str ~= '' do
+--
+--    end
+--    local TODO = 1 / nil
+--end

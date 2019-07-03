@@ -21,7 +21,7 @@ dofile(verbana.modpath .. '/privs.lua')
 -- libraries
 dofile(verbana.modpath .. '/util.lua')
 dofile(verbana.modpath .. '/lib_ip.lua')
-dofile(verbana.modpath .. '/asn.lua')
+dofile(verbana.modpath .. '/lib_asn.lua')
 
 -- connect to the DB - MAKE SURE TO CLEAN UP ALL "insecure" access points!
 local sql = verbana.ie.require('lsqlite3') -- TODO what happens if this isn't installed? ....

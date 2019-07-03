@@ -168,7 +168,7 @@ minetest.register_chatcommand('unverify', {
         minetest.set_player_privs(player_name, verbana.settings.unverified_privs)
         local player = minetest.get_player_by_name(player_name)
         if player then
-            player:set_pos(verbana.settings.verification_pos)
+            player:set_pos(verbana.settings.unverified_spawn_pos)
         end
         if reason then
             verbana.log('action', '%s unverified %s because %s', caller, player_name, reason)
