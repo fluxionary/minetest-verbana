@@ -1,12 +1,10 @@
-if not verbana then verbana = {} end
-if not verbana.modpath then verbana.modpath = '.' end
-if not verbana.ip then dofile(verbana.modpath .. '/lib_ip.lua') end
-if not verbana.log then function verbana.log(_, message, ...) print(message:format(...)) end end
+verbana.data = {}
+
+local lib_asn = verbana.lib_asn
+local lib_ip = verbana.lib_ip
 
 local sql = verbana.sql
 local db = verbana.db
-
-verbana.data = {}
 
 -- constants
 verbana.data.player_status = {
@@ -207,11 +205,11 @@ function verbana.data.import_from_sban(filename)
     if not insert_log_statement then return _error() end
     for name, ipstr, created, last_login in sban_db:urows('SELECT name, ip, created, last_login FROM playerdata') do
         local player_id = player_id_by_name[name]
-        if not verbana.ip.is_valid_ip(ipstr) then
+        if not lib_ip.is_valid_ip(ipstr) then
             return _error('%s is not a valid IPv4 address', ipstr)
         end
-        local ipint = verbana.ip.ipstr_to_ipint(ipstr)
-        local asn = verbana.asn.lookup(ipint)
+        local ipint = lib_ip.ipstr_to_ipint(ipstr)
+        local asn = lib_asn.lookup(ipint)
         if not bind_and_step(insert_ip_statement, 'insert IP', ipint) then return _error() end
         if not bind_and_step(insert_asn_statement, 'insert ASN', asn) then return _error() end
         if not bind_and_step(insert_assoc_statement, 'insert assoc', player_id, ipint, asn, created, created) then return _error() end
@@ -285,16 +283,23 @@ function verbana.data.import_from_sban(filename)
 end -- verbana.data.import_from_sban
 
 
+local player_id_cache = {}
 function verbana.data.get_player_id(name, create_if_new)
+    local cached_id = player_id_cache[name]
+    if cached_id then return cached_id end
     if create_if_new then
         if not execute_bind_one('INSERT OR IGNORE INTO player (name) VALUES (?)', 'insert player', name) then return nil end
     end
     local table = get_full_table('SELECT id FROM player WHERE name = ? LIMIT 1', 'get player id', name)
     if not (table and table[1]) then return nil end
+    player_id_cache[name] = table[1][1]
     return table[1][1]
 end
 
+local player_status_cache = {}
 function verbana.data.get_player_status(player_id, create_if_new)
+    local cached_status = player_status_cache[player_id]
+    if cached_status then return cached_status end
     local code = [[
         SELECT executor.id   executor_id
              , executor.name executor
@@ -312,6 +317,7 @@ function verbana.data.get_player_status(player_id, create_if_new)
     ]]
     local table = get_full_ntable(code, 'get player status', player_id)
     if #table == 1 then
+        player_status_cache[player_id] = table[1]
         return table[1]
     elseif #table > 1 then
         verbana.log('error', 'somehow got more than 1 result when getting current player status for %s', player_id)
@@ -332,6 +338,7 @@ function verbana.data.get_player_status(player_id, create_if_new)
     }
 end
 function verbana.data.set_player_status(player_id, executor_id, status_id, reason, expires, no_update_current)
+    player_status_cache[player_id] = nil
     local code = [[
         INSERT INTO player_status_log (player_id, executor_id, status_id, reason, expires, timestamp)
              VALUES                   (?,         ?,           ?,         ?,      ?,       ?)
@@ -345,7 +352,10 @@ function verbana.data.set_player_status(player_id, executor_id, status_id, reaso
     return true
 end
 
+local ip_status_cache = {}
 function verbana.data.get_ip_status(ipint, create_if_new)
+    local cached_status = ip_status_cache[ipint]
+    if cached_status then return cached_status end
     local code = [[
         SELECT executor.id   executor_id
              , executor.name executor
@@ -363,6 +373,7 @@ function verbana.data.get_ip_status(ipint, create_if_new)
     ]]
     local table = get_full_ntable(code, 'get ip status', ipint)
     if #table == 1 then
+        ip_status_cache[ipint] = table[1]
         return table[1]
     elseif #table > 1 then
         verbana.log('error', 'somehow got more than 1 result when getting current ip status for %s', ipint)
@@ -383,6 +394,7 @@ function verbana.data.get_ip_status(ipint, create_if_new)
     }
 end
 function verbana.data.set_ip_status(ipint, executor_id, status_id, reason, expires)
+    ip_status_cache[ipint] = nil
     local code = [[
         INSERT INTO ip_status_log (ip, executor_id, status_id, reason, expires, timestamp)
              VALUES               (?,  ?,           ?,         ?,      ?,       ?)
@@ -394,7 +406,10 @@ function verbana.data.set_ip_status(ipint, executor_id, status_id, reason, expir
     return true
 end
 
+local asn_status_cache = {}
 function verbana.data.get_asn_status(asn, create_if_new)
+    local cached_status = asn_status_cache[asn]
+    if cached_status then return cached_status end
     local code = [[
         SELECT executor.id   executor_id
              , executor.name executor
@@ -412,6 +427,7 @@ function verbana.data.get_asn_status(asn, create_if_new)
     ]]
     local table = get_full_ntable(code, 'get asn status', asn)
     if #table == 1 then
+        asn_status_cache[asn] = table[1]
         return table[1]
     elseif #table > 1 then
         verbana.log('error', 'somehow got more than 1 result when getting current asn status for %s', asn)
@@ -432,6 +448,7 @@ function verbana.data.get_asn_status(asn, create_if_new)
     }
 end
 function verbana.data.set_asn_status(asn, executor_id, status_id, reason, expires)
+    asn_status_cache[asn] = nil
     local code = [[
         INSERT INTO asn_status_log (asn, executor_id, status_id, reason, expires, timestamp)
              VALUES                (?,   ?,           ?,         ?,      ?,       ?)
@@ -672,7 +689,11 @@ function verbana.data.get_all_banned_players()
              , player_status_log.expires   expires
           FROM player
      LEFT JOIN player_status_log ON player.id == player_status_log.player_id
-         WHERE player_status_log.status_id IN (4, 5, 6)
-    ]] -- TODO: ... hard-coded values? ...
-    return get_full_ntable(code, 'all banned')
+         WHERE player_status_log.status_id IN (?, ?, ?)
+    ]]
+    return get_full_ntable(code, 'all banned',
+        verbana.data.player_status.banned,
+        verbana.data.player_status.tempbanned,
+        verbana.data.player_status.locked
+    )
 end

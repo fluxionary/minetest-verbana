@@ -3,43 +3,54 @@ local function table_is_empty(t)
     return true
 end
 
-local USING_VERIFICATION_JAIL = verbana.settings.verification_jail and verbana.settings.verification_jail_period
+local data = verbana.data
+local lib_asn = verbana.lib_asn
+local lib_ip = verbana.lib_ip
+local log = verbana.log
+local privs = verbana.privs
+local settings = verbana.settings
+local util = verbana.util
 
-local timer = 0
-local verification_jail = verbana.settings.verification_jail
+local safe = util.safe
+
+local USING_VERIFICATION_JAIL = settings.verification_jail and settings.verification_jail_period
+local verification_jail = settings.verification_jail
+local spawn_pos = settings.spawn_pos
+local unverified_spawn_pos = settings.unverified_spawn_pos
+local verification_jail_period = settings.verification_jail_period
+
 local check_player_privs = minetest.check_player_privs
-local spawn_pos = verbana.settings.spawn_pos
-local unverified_spawn_pos = verbana.settings.unverified_spawn_pos
-local verification_jail_period = verbana.settings.verification_jail_period
 
 local function should_rejail(player, player_status)
-    if player_status.status_id ~= verbana.data.player_status.unverified.id then
+    if player_status.status_id ~= data.player_status.unverified.id then
         return false
     end
     local pos = player:get_pos()
     return not (
-        verification_jail.x[1] <= pos.x and pos.x <= verification_jail.x[2] and
-        verification_jail.y[1] <= pos.y and pos.y <= verification_jail.y[2] and
-        verification_jail.z[1] <= pos.z and pos.z <= verification_jail.z[2]
+        verification_jail[1].x <= pos.x and pos.x <= verification_jail[2].x and
+        verification_jail[1].y <= pos.y and pos.y <= verification_jail[2].y and
+        verification_jail[1].z <= pos.z and pos.z <= verification_jail[2].z
     )
 end
 
 local function should_unjail(player, player_status)
-    if player_status.status_id == verbana.data.player_status.unverified.id then
+    if player_status.status_id == data.player_status.unverified.id then
         return false
-    elseif verbana.privs.is_privileged(player:get_player_name()) then
+    elseif privs.is_privileged(player:get_player_name()) then
         return false
     end
 
     local pos = player:get_pos()
     return (
-        verification_jail.x[1] <= pos.x and pos.x <= verification_jail.x[2] and
-        verification_jail.y[1] <= pos.y and pos.y <= verification_jail.y[2] and
-        verification_jail.z[1] <= pos.z and pos.z <= verification_jail.z[2]
+        verification_jail[1].x <= pos.x and pos.x <= verification_jail[2].x and
+        verification_jail[1].y <= pos.y and pos.y <= verification_jail[2].y and
+        verification_jail[1].z <= pos.z and pos.z <= verification_jail[2].z
     )
 end
 
+
 if USING_VERIFICATION_JAIL then
+    local timer = 0
     minetest.register_globalstep(function(dtime)
         timer = timer + dtime;
         if timer < verification_jail_period then
@@ -47,51 +58,56 @@ if USING_VERIFICATION_JAIL then
         end
         timer = 0
         for _, player in ipairs(minetest.get_connected_players()) do
-            -- TODO this is pretty heavy
             local name = player:get_player_name()
-            local player_id = verbana.data.get_player_id(name)
-            local player_status = verbana.data.get_player_status(player_id)
+            local player_id = data.get_player_id(name) -- cached, so not heavy
+            local player_status = data.get_player_status(player_id) -- cached, so not heavy
             if should_rejail(player, player_status) then
-                player:set_pos(unverified_spawn_pos)
+                log('action', 'rejailing %s', name)
+                if not settings.debug_mode then
+                    player:set_pos(unverified_spawn_pos)
+                end
             elseif should_unjail(player, player_status) then
-                player:set_pos(spawn_pos)
+                log('action', 'unjailing %s', name)
+                if not settings.debug_mode then
+                    player:set_pos(spawn_pos)
+                end
             end
         end
     end)
 end
 
-minetest.register_on_prejoinplayer(function(name, ipstr)
+minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     -- return a string w/ the reason for refusal; otherwise return nothing
-    verbana.log('action', 'prejoin: %s %s', name, ipstr)
-    local ipint = verbana.ip.ipstr_to_ipint(ipstr)
-    local asn, asn_description = verbana.asn.lookup(ipint)
+    log('action', 'prejoin: %s %s', name, ipstr)
+    local ipint = lib_ip.ipstr_to_ipint(ipstr)
+    local asn, asn_description = lib_asn.lookup(ipint)
 
-    local player_id = verbana.data.get_player_id(name, true) -- will create one if none exists
-    local player_status = verbana.data.get_player_status(player_id, true)
-    local ip_status = verbana.data.get_ip_status(ipint, true) -- will create one if none exists
-    local asn_status = verbana.data.get_asn_status(asn, true) -- will create one if none exists
+    local player_id = data.get_player_id(name, true) -- will create one if none exists
+    local player_status = data.get_player_status(player_id, true)
+    local ip_status = data.get_ip_status(ipint, true) -- will create one if none exists
+    local asn_status = data.get_asn_status(asn, true) -- will create one if none exists
 
     -- check and clear temporary statuses
     local now = os.time()
     if player_status.name == 'tempbanned' then
         local expires = player_status.expires or now
         if now >= expires then
-            verbana.data.unban_player(player_id, player_status.executor_id, 'temp ban expired')
-            player_status = verbana.data.get_player_status(player_id) -- refresh player status
+            data.unban_player(player_id, player_status.executor_id, 'temp ban expired')
+            player_status = data.get_player_status(player_id) -- refresh player status
         end
     end
     if ip_status.name == 'tempblocked' then
         local expires = ip_status.expires or now
         if now >= expires then
-            verbana.data.unblock_ip(ipint, ip_status.executor_id, 'temp block expired')
-            ip_status = verbana.data.get_ip_status(ipint) -- refresh ip status
+            data.unblock_ip(ipint, ip_status.executor_id, 'temp block expired')
+            ip_status = data.get_ip_status(ipint) -- refresh ip status
         end
     end
     if asn_status.name == 'tempblocked' then
         local expires = asn_status.expires or now
         if now >= expires then
-            verbana.data.unblock_asn(asn, asn_status.executor_id, 'temp block expired')
-            asn_status = verbana.data.get_asn_status(asn) -- refresh asn status
+            data.unblock_asn(asn, asn_status.executor_id, 'temp block expired')
+            asn_status = data.get_asn_status(asn) -- refresh asn status
         end
     end
 
@@ -103,7 +119,7 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
 
     if player_status.name == 'whitelisted' then
         -- if the player is whitelisted, let them in.
-    elseif verbana.settings.privs_to_whitelist and minetest.check_player_privs(name, verbana.settings.privs_to_whitelist) then
+    elseif settings.whitelisted_privs and minetest.check_player_privs(name, settings.whitelisted_privs) then
         -- if the player has a whitelisted priv, let them in.
     elseif player_status.name == 'banned' then
         local reason = player_status.reason
@@ -171,7 +187,7 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
         -- if the player is new, let them in (truly new players will require verification)
         -- else if the player has never connected from this ip/asn, prevent them from connecting
         -- else let them in (mods will get an alert)
-        local has_assoc = verbana.data.has_asn_assoc(player_id, asn) or verbana.data.has_ip_assoc(player_id, ipint)
+        local has_assoc = data.has_asn_assoc(player_id, asn) or data.has_ip_assoc(player_id, ipint)
         if not has_assoc then
             -- note: if 'suspicious' is true, then 'return_value' should be nil before this
             return_value = 'Suspicious activity detected.'
@@ -179,15 +195,17 @@ minetest.register_on_prejoinplayer(function(name, ipstr)
     end
 
     if return_value then
-        verbana.data.log(player_id, ipint, asn, false)
-        verbana.log('action', 'Connection of %s from %s (A%s) denied because %q', name, ipstr, asn, return_value)
-        return return_value
+        data.log(player_id, ipint, asn, false)
+        log('action', 'Connection of %s from %s (A%s) denied because %q', name, ipstr, asn, return_value)
+        if not settings.debug_mode then
+            return return_value
+        end
     else
-        verbana.log('action', 'Connection of %s from %s (A%s) allowed', name, ipstr, asn)
-        verbana.data.log(player_id, ipint, asn, true)
-        verbana.data.assoc(player_id, ipint, asn)
+        log('action', 'Connection of %s from %s (A%s) allowed', name, ipstr, asn)
+        data.log(player_id, ipint, asn, true)
+        data.assoc(player_id, ipint, asn)
     end
-end)
+end))
 
 local function move_to(name, pos, max_tries)
     max_tries = max_tries or 5
@@ -196,7 +214,10 @@ local function move_to(name, pos, max_tries)
         -- get the player again here, in case they have disconnected
         local player = minetest.get_player_by_name(name)
         if player then
-            player:set_pos(pos)
+            log('action', 'moving %s to %s', name, minetest.pos_to_string(pos))
+            if not settings.debug_mode then
+                player:set_pos(pos)
+            end
         elseif tries < max_tries then
             tries = tries + 1
             minetest.after(1, f)
@@ -205,63 +226,74 @@ local function move_to(name, pos, max_tries)
     f()
 end
 
-minetest.register_on_newplayer(function(player)
+minetest.register_on_newplayer(safe(function(player)
     local name = player:get_player_name()
     local ipstr = minetest.get_player_ip(name)
-    local ipint = verbana.ip.ipstr_to_ipint(ipstr)
-    local asn = verbana.asn.lookup(ipint)
-    local player_id = verbana.data.get_player_id(name)
-    local ip_status = verbana.data.get_ip_status(ipint)
-    local asn_status = verbana.data.get_asn_status(asn)
+    local ipint = lib_ip.ipstr_to_ipint(ipstr)
+    local asn = lib_asn.lookup(ipint)
+    local player_id = data.get_player_id(name)
+    local ip_status = data.get_ip_status(ipint)
+    local asn_status = data.get_asn_status(asn)
 
     local need_to_verify = (
-        verbana.settings.universal_verification or
+        settings.universal_verification or
         ip_status.name == 'suspicious' or
         (asn_status.name == 'suspicious' and ip_status.name ~= 'trusted')
     )
 
     if need_to_verify then
-        if not verbana.data.set_player_status(player_id, verbana.data.verbana_player_id, verbana.data.player_status.unverified.id, 'new player connected from suspicious network') then
-            verbana.log('error', 'error setting unverified status on %s', name)
+        if not data.set_player_status(player_id, data.verbana_player_id, data.player_status.unverified.id, 'new player connected from suspicious network') then
+            log('error', 'error setting unverified status on %s', name)
         end
-        minetest.set_player_privs(name, verbana.settings.unverified_privs)
-        player:set_pos(unverified_spawn_pos)
+        if not settings.debug_mode then
+            minetest.set_player_privs(name, settings.unverified_privs)
+        end
         -- wait a second before moving the player to the verification area
         -- because other mods sometimes try to move them around as well
-        minetest.after(1, function() move_to(name, unverified_spawn_pos) end)
-        verbana.log('action', 'new player %s sent to verification', name)
+        minetest.after(1, move_to, name, unverified_spawn_pos)
+        log('action', 'new player %s sent to verification', name)
     else
-        verbana.data.set_player_status(
+        data.set_player_status(
             player_id,
-            verbana.data.verbana_player_id,
-            verbana.data.player_status.default.id,
+            data.verbana_player_id,
+            data.player_status.default.id,
             'new player'
         )
-        verbana.log('action', 'new player %s', name)
+        log('action', 'new player %s', name)
     end
-end)
+end))
 
-minetest.register_on_joinplayer(function(player)
+minetest.register_on_joinplayer(safe(function(player)
     local name = player:get_player_name()
+    local player_id = data.get_player_id(name)
+    local player_status = data.get_player_status(player_id)
     local ipstr = minetest.get_player_ip(name)
-    local ipint = verbana.ip.ipstr_to_ipint(ipstr)
-    local asn, asn_description = verbana.asn.lookup(ipint)
-    if minetest.check_player_privs(name, {[verbana.privs.unverified]=true}) then
+    local ipint = lib_ip.ipstr_to_ipint(ipstr)
+    local asn, asn_description = lib_asn.lookup(ipint)
+    local is_unverified = player_status.status_id == data.player_status.unverified.id
+    if is_unverified then
         verbana.chat.tell_mods(('*** Player %s from A%s (%s) is unverified.'):format(name, asn, asn_description))
     end
     if USING_VERIFICATION_JAIL then
-        local player_id = verbana.data.get_player_id(name)
-        local player_status = verbana.data.get_player_status(player_id)
-
         if should_rejail(player, player_status) then
-            player:set_pos(unverified_spawn_pos)
+            log('action', 'rejailing %s', name)
+            if not settings.debug_mode then
+                player:set_pos(unverified_spawn_pos)
+            end
         elseif should_unjail(player, player_status) then
-            player:set_pos(spawn_pos)
+            log('action', 'unjailing %s', name)
+            if not settings.debug_mode then
+                player:set_pos(spawn_pos)
+            end
         end
     end
-end)
+end))
 
+minetest.register_on_auth_fail(safe(function(name, ipstr)
+    log('action', 'auth failure: %s %s', name, ipstr)
+    local ipint = lib_ip.ipstr_to_ipint(ipstr)
+    local asn = lib_asn.lookup(ipint)
+    local player_id = data.get_player_id(name, true) -- will create one if none exists
 
-minetest.register_on_auth_fail(function(name, ip)
-    -- TODO log failure
-end)
+    data.log(player_id, ipint, asn, false)
+end))

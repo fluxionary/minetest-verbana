@@ -60,3 +60,30 @@ end
 --    end
 --    local TODO = 1 / nil
 --end
+
+function verbana.util.safe(func)
+    -- wrap a function w/ logic to avoid crashing the game
+    return function(...)
+        local status, out = pcall(func, ...)
+        if status then
+            return out
+        else
+            verbana.log('warning', 'Error (func): %s', out)
+            return nil
+        end
+    end
+end
+
+function verbana.util.safe_kick_player(caller, player, reason)
+    local player_name = player:get_player_name()
+    verbana.log('action', 'kicking %s...', player_name)
+    if not verbana.settings.debug_mode then
+        if not minetest.kick_player(player_name, reason) then
+            player:set_detach()
+            if not minetest.kick_player(player_name, reason) then
+                minetest.chat_send_player(caller, ('Failed to kick player %s after detaching!'):format(player_name))
+                verbana.log('warning', 'Failed to kick player %s after detaching!', player_name)
+            end
+        end
+    end
+end

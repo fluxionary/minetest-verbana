@@ -1,3 +1,1 @@
-add a "report" command so that players can log issues w/ other players for the mods to peruse
 
-in login_handling.lua: register_on_auth_fail should log
