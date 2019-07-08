@@ -1,1 +1,2 @@
-
+IPs and ASNs have to be inserted into the relevant tables (ip and asn) before we can log them...
+also, probably set the current_status_id when we update their statuses

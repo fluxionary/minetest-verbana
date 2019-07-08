@@ -2,6 +2,7 @@ verbana.data = {}
 
 local lib_asn = verbana.lib_asn
 local lib_ip = verbana.lib_ip
+local log = verbana.log
 
 local sql = verbana.sql
 local db = verbana.db
@@ -36,7 +37,7 @@ verbana.data.verbana_player_id = 1
 -- wrap sqllite API to make error reporting less messy
 local function execute(code, description)
     if db:exec(code) ~= sql.OK then
-        verbana.log('error', 'executing %s %q: %s', description, code, db:errmsg())
+        log('error', 'executing %s %q: %s', description, code, db:errmsg())
         return false
     end
     return true
@@ -45,7 +46,7 @@ end
 local function prepare(code, description)
     local statement = db:prepare(code)
     if not statement then
-        verbana.log('error', 'preparing %s %q: %s', description, code, db:errmsg())
+        log('error', 'preparing %s %q: %s', description, code, db:errmsg())
         return nil
     end
     return statement
@@ -53,7 +54,7 @@ end
 
 local function bind(statement, description, ...)
     if statement:bind_values(...) ~= sql.OK then
-        verbana.log('error', 'binding %s: %s', description, db:errmsg())
+        log('error', 'binding %s: %s %q', description, db:errmsg(), minetest.serialize({...}))
         return false
     end
     return true
@@ -62,7 +63,7 @@ end
 local function bind_and_step(statement, description, ...)
     if not bind(statement, description, ...) then return false end
     if statement:step() ~= sql.DONE then
-        verbana.log('unbans: stepping %s: %s', description, db:errmsg())
+        log('error', 'stepping %s: %s %q', description, db:errmsg(), minetest.serialize({...}))
         return false
     end
     statement:reset()
@@ -71,7 +72,7 @@ end
 
 local function finalize(statement, description)
     if statement:finalize() ~= sql.OK then
-        verbana.log('unbans: finalizing %s: %s', description, db:errmsg())
+        log('error', 'finalizing %s: %s', description, db:errmsg())
         return false
     end
     return true
@@ -120,7 +121,7 @@ local function init_status_table(table_name, data)
     local status_sql = ('INSERT OR IGNORE INTO %s_status (id, name) VALUES (?, ?)'):format(table_name)
     local status_statement = prepare(status_sql, ('initialize %s_status'):format(table_name))
     if not status_statement then return false end
-    for _, status in sort_status_table(data) do
+    for _, status in ipairs(sort_status_table(data)) do
         if not bind_and_step(status_statement, 'insert status', status.id, status.name) then
             return false
         end
@@ -165,17 +166,17 @@ function verbana.data.import_from_sban(filename)
 
     local sban_db, _, errormsg = sql.open(filename, sql.OPEN_READONLY)
     if not sban_db then
-        verbana.log('error', 'Error opening %s: %s', filename, errormsg)
+        log('error', 'Error opening %s: %s', filename, errormsg)
         return false
     end
 
     local function _error(message, ...)
         if message then
-            verbana.log('error', message, ...)
+            log('error', message, ...)
         end
         execute('ROLLBACK', 'sban import rollback')
         if sban_db:close() ~= sql.OK then
-            verbana.log('error', 'closing sban DB %s', sban_db:errmsg())
+            log('error', 'closing sban DB %s', sban_db:errmsg())
         end
         return false
     end
@@ -270,15 +271,15 @@ function verbana.data.import_from_sban(filename)
     -- CLEANUP --
     if not execute('COMMIT') then
         if sban_db:close() ~= sql.OK then
-            verbana.log('error', 'closing sban DB %s', sban_db:errmsg())
+            log('error', 'closing sban DB %s', sban_db:errmsg())
         end
         return false
     end
     if sban_db:close() ~= sql.OK then
-        verbana.log('error', 'closing sban DB %s', sban_db:errmsg())
+        log('error', 'closing sban DB %s', sban_db:errmsg())
         return false
     end
-    verbana.log('action', 'imported from SBAN in %s seconds', os.clock() - start)
+    log('action', 'imported from SBAN in %s seconds', os.clock() - start)
     return true
 end -- verbana.data.import_from_sban
 
@@ -320,13 +321,13 @@ function verbana.data.get_player_status(player_id, create_if_new)
         player_status_cache[player_id] = table[1]
         return table[1]
     elseif #table > 1 then
-        verbana.log('error', 'somehow got more than 1 result when getting current player status for %s', player_id)
+        log('error', 'somehow got more than 1 result when getting current player status for %s', player_id)
         return nil
     elseif not create_if_new then
         return nil
     end
     if not verbana.data.set_player_status(player_id, verbana.data.verbana_player_id, verbana.data.player_status.unknown.id, 'creating initial player status') then
-        verbana.log('error', 'failed to set initial player status')
+        log('error', 'failed to set initial player status')
         return nil
     end
     return {
@@ -343,7 +344,7 @@ function verbana.data.set_player_status(player_id, executor_id, status_id, reaso
         INSERT INTO player_status_log (player_id, executor_id, status_id, reason, expires, timestamp)
              VALUES                   (?,         ?,           ?,         ?,      ?,       ?)
     ]]
-    if not execute_bind_one(code, 'insert player status', player_id, executor_id, status_id, reason, expires, os.clock()) then return false end
+    if not execute_bind_one(code, 'set player status', player_id, executor_id, status_id, reason, expires, os.clock()) then return false end
     if not no_update_current then
         local last_id = db:last_insert_rowid()
         local code = 'UPDATE player SET current_status_id = ? WHERE id = ?'
@@ -376,13 +377,13 @@ function verbana.data.get_ip_status(ipint, create_if_new)
         ip_status_cache[ipint] = table[1]
         return table[1]
     elseif #table > 1 then
-        verbana.log('error', 'somehow got more than 1 result when getting current ip status for %s', ipint)
+        log('error', 'somehow got more than 1 result when getting current ip status for %s', ipint)
         return nil
     elseif not create_if_new then
         return nil
     end
     if not verbana.data.set_ip_status(ipint, verbana.data.verbana_player_id, verbana.data.ip_status.default.id, 'creating initial ip status') then
-        verbana.log('error', 'failed to set initial ip status')
+        log('error', 'failed to set initial ip status')
         return nil
     end
     return {
@@ -399,7 +400,7 @@ function verbana.data.set_ip_status(ipint, executor_id, status_id, reason, expir
         INSERT INTO ip_status_log (ip, executor_id, status_id, reason, expires, timestamp)
              VALUES               (?,  ?,           ?,         ?,      ?,       ?)
     ]]
-    if not execute_bind_one(code, 'insert player status', ipint, executor_id, status_id, reason, expires, os.clock()) then return false end
+    if not execute_bind_one(code, 'set ip status', ipint, executor_id, status_id, reason, expires, os.clock()) then return false end
     local last_id = db:last_insert_rowid()
     local code = 'UPDATE ip SET current_status_id = ? WHERE ip = ?'
     if not execute_bind_one(code, 'update ip last status id', last_id, ipint) then return false end
@@ -430,13 +431,13 @@ function verbana.data.get_asn_status(asn, create_if_new)
         asn_status_cache[asn] = table[1]
         return table[1]
     elseif #table > 1 then
-        verbana.log('error', 'somehow got more than 1 result when getting current asn status for %s', asn)
+        log('error', 'somehow got more than 1 result when getting current asn status for %s', asn)
         return nil
     elseif not create_if_new then
         return nil
     end
     if not verbana.data.set_asn_status(asn, verbana.data.verbana_player_id, verbana.data.asn_status.default.id, 'creating initial asn status') then
-        verbana.log('error', 'failed to set initial asn status')
+        log('error', 'failed to set initial asn status')
         return nil
     end
     return {
@@ -453,7 +454,7 @@ function verbana.data.set_asn_status(asn, executor_id, status_id, reason, expire
         INSERT INTO asn_status_log (asn, executor_id, status_id, reason, expires, timestamp)
              VALUES                (?,   ?,           ?,         ?,      ?,       ?)
     ]]
-    if not execute_bind_one(code, 'insert player status', asn, executor_id, status_id, reason, expires, os.clock()) then return false end
+    if not execute_bind_one(code, 'set asn status', asn, executor_id, status_id, reason, expires, os.clock()) then return false end
     local last_id = db:last_insert_rowid()
     local code = 'UPDATE asn SET current_status_id = ? WHERE asn = ?'
     if not execute_bind_one(code, 'update asn last status id', last_id, asn) then return false end

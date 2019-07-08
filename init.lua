@@ -1,6 +1,5 @@
-if false then
 verbana = {}
-verbana.version = '1.0.0'
+verbana.version = '0.1.0'
 local modname = minetest.get_current_modname()
 verbana.modname = modname
 verbana.modpath = minetest.get_modpath(modname)
@@ -52,4 +51,3 @@ sqlite3 = nil
 verbana.ie = nil
 verbana.sql = nil
 verbana.db = nil
-end

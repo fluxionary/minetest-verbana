@@ -45,7 +45,7 @@ function verbana.util.parse_time(text)
     if type(text) ~= 'string' then
         return nil
     end
-    local n, unit = text:lower():match('^(\d+)([hdwmy])')
+    local n, unit = text:lower():match('^(%d+)([hdwmy])')
     if not (n and unit) then
         return nil
     end
@@ -68,7 +68,7 @@ function verbana.util.safe(func)
         if status then
             return out
         else
-            verbana.log('warning', 'Error (func): %s', out)
+            verbana.log('error', 'Error (func): %s', out)
             return nil
         end
     end
