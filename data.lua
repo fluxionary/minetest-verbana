@@ -639,16 +639,18 @@ end
 
 function verbana.data.get_player_associations(player_id)
     local code = [[
-        SELECT assoc.ip                 ipint
-             , assoc.asn                asn
-             , ip_status_log.status_id  ip_status_id
-             , asn_status_log.status_id asn_status_id
+        SELECT assoc.ip        ipint
+             , assoc.asn       asn
+             , ip_status.name  ip_status
+             , asn_status.name asn_status
           FROM assoc
           JOIN player         ON player.id == assoc.player_id
           JOIN ip             ON ip.ip == log.ip
      LEFT JOIN ip_status_log  ON ip.current_status_id == ip_status_log.id
+     LEFT JOIN ip_status      ON ip_status_log.status_id == ip_status.id
           JOIN asn            ON asn.asn == log.asn
      LEFT JOIN asn_status_log ON asn.current_status_id == asn_status_log.id
+     LEFT JOIN asn_status     ON asn_status_log.status_id == asn_status.id
          WHERE player.id == ?
       ORDER BY assoc.asn, assoc.ip
     ]]

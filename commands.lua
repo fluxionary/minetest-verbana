@@ -14,7 +14,7 @@ local safe = verbana.util.safe
 local safe_kick_player = verbana.util.safe_kick_player
 
 local function register_chatcommand(name, def)
-    if debug_mode then name = ('%s_%s'):format(verbana.modname, name) end
+    if debug_mode then name = ('v_%s'):format(name) end
     def.func = safe(def.func)
     minetest.register_chatcommand(name, def)
 end
@@ -22,7 +22,7 @@ end
 local function override_chatcommand(name, def)
     def.func = safe(def.func)
     if debug_mode then
-        name = ('%s_%s'):format(verbana.modname, name)
+        name = ('v_%s'):format(name)
         minetest.register_chatcommand(name, def)
     else
         minetest.override_chatcommand(name, def)
@@ -569,39 +569,56 @@ local function parse_ip_status_params(params)
     local ipint = lib_ip.ipstr_to_ipint(ipstr)
     data.register_ip(ipint)
     local ip_status = data.get_ip_status(ipint, true)
-    return ipint, ip_status, reason
+    return ipint, ipstr, ip_status, reason
 end
 
 local function parse_timed_ip_status_params(params)
---    TODO
---    local name, timespan_str, reason = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)%s+(.*)$')
---    if not name then
---        name, timespan_str = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)$')
---    end
---    if not name or name:len() > 20 then
---        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
---    end
---    local timespan = verbana.util.parse_time(timespan_str)
---    if not timespan then
---        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
---    end
---    local player_id = data.get_player_id(name)
---    if not player_id then
---        return nil, nil, nil, nil, ('Unknown player: %s'):format(name)
---    end
---    local player_status = data.get_player_status(player_id, true)
---    local expires = os.time() + timespan
---    return player_id, name, player_status, expires, reason
+    local ipstr, timespan_str, reason = params:match('^(%d+%.%d+%.%d+%.%d+)%s+(%d+%w)%s+(.*)$')
+    if not ipstr then
+        ipstr, timespan_str = params:match('^(%d+%.%d+%.%d+%.%d+)%s+(%d+%w)$')
+    end
+    if not ipstr or not lib_ip.is_valid_ip(ipstr) then
+        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+    end
+    local timespan = verbana.util.parse_time(timespan_str)
+    if not timespan then
+        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+    end
+    local ipint = lib_ip.ipstr_to_ipint(ipstr)
+    data.register_ip(ipint)
+    local ip_status = data.get_ip_status(ipint, true)
+    local expires = os.time() + timespan
+    return ipint, ipstr, ip_status, expires, reason
 end
-
-
 
 register_chatcommand('trust_ip', {
     params='<ip> [reason]',
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
+        if not ipint then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                data.ip_status.default.id,
+                data.ip_status.suspicious.id,
+            }, ip_status.status_id) then
+            return false, ('Cannot trust IP w/ status %s'):format(ip_status.name)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.trusted.id, reason) then
+            return false, 'ERROR setting IP status'
+        end
+        if reason then
+            log('action', '%s trusted %s because %s', caller, ipstr, reason)
+        else
+            log('action', '%s trusted %s', caller, ipstr)
+        end
+        return true, ('Trusted %s'):format(ipstr)
     end
 })
 
@@ -610,7 +627,26 @@ register_chatcommand('untrust_ip', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
+        if not ipint then
+            return false, reason
+        end
+        if ip_status.status_id ~= data.player_status.trusted.id then
+            return false, ('IP %s is not trusted!'):format(ipstr)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.default.id, reason) then
+            return false, 'ERROR setting IP status'
+        end
+        if reason then
+            log('action', '%s untrusted %s because %s', caller, ipstr, reason)
+        else
+            log('action', '%s untrusted %s', caller, ipstr)
+        end
+        return true, ('Untrusted %s'):format(ipstr)
     end
 })
 
@@ -619,7 +655,28 @@ register_chatcommand('suspect_ip', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
+        if not ipint then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                data.ip_status.default.id,
+            }, ip_status.status_id) then
+            return false, ('Cannot suspect IP w/ status %s'):format(ip_status.name)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.suspicious.id, reason) then
+            return false, 'ERROR setting IP status'
+        end
+        if reason then
+            log('action', '%s suspected %s because %s', caller, ipstr, reason)
+        else
+            log('action', '%s suspected %s', caller, ipstr)
+        end
+        return true, ('Suspected %s'):format(ipstr)
     end
 })
 
@@ -628,7 +685,26 @@ register_chatcommand('unsuspect_ip', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
+        if not ipint then
+            return false, reason
+        end
+        if ip_status.status_id ~= data.player_status.suspicious.id then
+            return false, ('IP %s is not suspicious!'):format(ipstr)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.default.id, reason) then
+            return false, 'ERROR setting IP status'
+        end
+        if reason then
+            log('action', '%s unsuspected %s because %s', caller, ipstr, reason)
+        else
+            log('action', '%s unsuspected %s', caller, ipstr)
+        end
+        return true, ('Unsuspected %s'):format(ipstr)
     end
 })
 
@@ -637,7 +713,36 @@ register_chatcommand('block_ip', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
+        if not ipint then
+            return false, reason
+        end
+        if reason then
+            local first = reason:match('^(%S+)')
+            if verbana.util.parse_time(first) then
+                return false, ('Given reason begins with a timespan %q. Did you mean to use tempblock_ip?'):format(first)
+            end
+        end
+        if not verbana.util.table_contains({
+                data.ip_status.default.id,
+                data.ip_status.suspicious.id,
+            }, ip_status.status_id) then
+            return false, ('Cannot block IP w/ status %s'):format(ip_status.name)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.blocked.id, reason) then
+            return false, 'ERROR setting IP status'
+        end
+        -- TODO: kick all connected players
+        if reason then
+            log('action', '%s blocked %s because %s', caller, ipstr, reason)
+        else
+            log('action', '%s blocked %s', caller, ipstr)
+        end
+        return true, ('Blocked %s'):format(ipstr)
     end
 })
 
@@ -646,7 +751,31 @@ register_chatcommand('tempblock_ip', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipint, ipstr, ip_status, expires, reason = parse_timed_ip_status_params(params)
+        if not ipint then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                data.ip_status.default.id,
+                data.ip_status.suspicious.id,
+            }, ip_status.status_id) then
+            return false, ('Cannot block IP w/ status %s'):format(ip_status.name)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.tempblocked.id, reason, expires) then
+            return false, 'ERROR setting IP status'
+        end
+        -- TODO: kick all connected players
+        local expires_str = os.date("%c", expires)
+        if reason then
+            log('action', '%s tempblocked %s until %s because %s', caller, ipstr, expires_str, reason)
+        else
+            log('action', '%s tempblocked %s until %s', caller, ipstr, expires_str)
+        end
+        return true, ('Temporarily blocked %s until %s'):format(ipstr, expires_str)
     end
 })
 
@@ -655,16 +784,101 @@ register_chatcommand('unblock_ip', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
+        if not ipint then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                data.ip_status.blocked.id,
+                data.ip_status.tempblocked.id,
+            }, ip_status.status_id) then
+            return false, 'IP is not blocked!'
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.default.id, reason) then
+            return false, 'ERROR setting IP status'
+        end
+        if reason then
+            log('action', '%s unblocked %s because %s', caller, ipstr, reason)
+        else
+            log('action', '%s unblocked %s', caller, ipstr)
+        end
+        return true, ('Unblocked %s'):format(ipstr)
     end
 })
 ----------------- SET ASN STATUS COMMANDS -----------------
+local function parse_asn_status_params(params)
+    local asnstr, reason = params:match('^A?(%d+)%s+(.*)$')
+    if not asnstr then
+        asnstr = params:match('^A?(%d+)$')
+    end
+    if not asnstr then
+        return nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+    end
+    local asn = tonumber(asnstr)
+    local description = lib_asn.verbana.get_description(asn)
+    if description == lib_asn.invalid_asn_description then
+        return nil, nil, nil, ('Not a valid ASN: %q'):format(params)
+    end
+    data.register_asn(asn)
+    local asn_status = data.get_asn_status(asn, true)
+    return asn, description, asn_status, reason
+end
+
+local function parse_timed_asn_status_params(params)
+    local asnstr, timespan_str, reason = params:match('^A?(%d+)%s+(%d+%w)%s+(.*)$')
+    if not asnstr then
+        asnstr, timespan_str = params:match('^A?(%d+)%s+(%d+%w)$')
+    end
+    if not asnstr then
+        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+    end
+    local asn = tonumber(asnstr)
+    local description = lib_asn.verbana.get_description(asn)
+    if description == lib_asn.invalid_asn_description then
+        return nil, nil, nil, ('Not a valid ASN: %q'):format(params)
+    end
+    local timespan = verbana.util.parse_time(timespan_str)
+    if not timespan then
+        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+    end
+    data.register_asn(asn)
+    local asn_status = data.get_asn_status(asn, true)
+    local expires = os.time() + timespan
+    return asn, description, asn_status, expires, reason
+end
+
+
 register_chatcommand('suspect_asn', {
     params='<asn> [reason]',
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local asn, description, asn_status, reason = parse_asn_status_params(params)
+        if not asn then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                data.asn_status.default.id,
+            }, asn_status.status_id) then
+            return false, ('Cannot suspect ASN w/ status %s'):format(asn_status.name)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_asn_status(asn, executor_id, data.asn_status.suspicious.id, reason) then
+            return false, 'ERROR setting ASN status'
+        end
+        if reason then
+            log('action', '%s suspected A%s because %s', caller, asn, reason)
+        else
+            log('action', '%s suspected A%s', caller, asn)
+        end
+        return true, ('Suspected A%s'):format(asn)
     end
 })
 
@@ -673,7 +887,26 @@ register_chatcommand('unsuspect_asn', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local asn, description, asn_status, reason = parse_asn_status_params(params)
+        if not asn then
+            return false, reason
+        end
+        if asn_status.status_id ~= data.asn_status.suspicious.id then
+            return false, ('A%s is not suspicious!'):format(asn)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_asn_status(asn, executor_id, data.asn_status.default.id, reason) then
+            return false, 'ERROR setting ASN status'
+        end
+        if reason then
+            log('action', '%s unsuspected A%s because %s', caller, asn, reason)
+        else
+            log('action', '%s unsuspected A%s', caller, asn)
+        end
+        return true, ('Unsuspected A%s'):format(asn)
     end
 })
 
@@ -682,7 +915,36 @@ register_chatcommand('block_asn', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local asn, description, asn_status, reason = parse_asn_status_params(params)
+        if not asn then
+            return false, reason
+        end
+        if reason then
+            local first = reason:match('^(%S+)')
+            if verbana.util.parse_time(first) then
+                return false, ('Given reason begins with a timespan %q. Did you mean to use tempblock_asn?'):format(first)
+            end
+        end
+        if not verbana.util.table_contains({
+                data.asn_status.default.id,
+                data.asn_status.suspicious.id,
+            }, asn_status.status_id) then
+            return false, ('Cannot block ASN w/ status %s'):format(asn_status.name)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_asn_status(asn, executor_id, data.asn_status.blocked.id, reason) then
+            return false, 'ERROR setting ASN status'
+        end
+        -- TODO: kick all connected players
+        if reason then
+            log('action', '%s blocked A%s because %s', caller, asn, reason)
+        else
+            log('action', '%s blocked A%s', caller, asn)
+        end
+        return true, ('Blocked A%s'):format(asn)
     end
 })
 
@@ -691,7 +953,31 @@ register_chatcommand('tempblock_asn', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local asn, description, asn_status, expires, reason = parse_timed_asn_status_params(params)
+        if not asn then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                data.asn_status.default.id,
+                data.asn_status.suspicious.id,
+            }, ip_status.status_id) then
+            return false, ('Cannot block ASN w/ status %s'):format(asn_status.name)
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_asn_status(asn, executor_id, data.asn_status.tempblocked.id, reason, expires) then
+            return false, 'ERROR setting IP status'
+        end
+        -- TODO: kick all connected players
+        local expires_str = os.date("%c", expires)
+        if reason then
+            log('action', '%s tempblocked A%s until %s because %s', caller, asn, expires_str, reason)
+        else
+            log('action', '%s tempblocked A%s until %s', caller, asn, expires_str)
+        end
+        return true, ('Temporarily blocked A%s until %s'):format(asn, expires_str)
     end
 })
 
@@ -700,7 +986,29 @@ register_chatcommand('unblock_asn', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local asn, description, asn_status, expires, reason = parse_timed_asn_status_params(params)
+        if not asn then
+            return false, reason
+        end
+        if not verbana.util.table_contains({
+                data.asn_status.blocked.id,
+                data.asn_status.tempblocked.id,
+            }, asn_status.status_id) then
+            return false, 'ASN is not blocked!'
+        end
+        local executor_id = data.get_player_id(caller)
+        if not executor_id then
+            return false, 'ERROR: could not get executor ID?'
+        end
+        if not data.set_asn_status(asn, executor_id, data.asn_status.default.id, reason) then
+            return false, 'ERROR setting IP status'
+        end
+        if reason then
+            log('action', '%s unblocked A%s because %s', caller, asn, reason)
+        else
+            log('action', '%s unblocked A%s', caller, asn)
+        end
+        return true, ('Unblocked A%s'):format(asn)
     end
 })
 ---------------- GET LOGS ---------------
@@ -709,7 +1017,7 @@ register_chatcommand('player_status_log', {
     description='shows the status log of a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local name, numberstr = string.match(params, '^([%a%d_-]+) +(%d+)$')
+        local name, numberstr = string.match(params, '^([%a%d_-]+)%s+(%d+)$')
         if not name then
             name = string.match(params, '^([%a%d_-]+)$')
         end
@@ -756,7 +1064,42 @@ register_chatcommand('ip_status_log', {
     description='shows the status log of an IP',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipstr, numberstr = string.match(params, '^(%d+%.%d+%.%d+%.%d+)%s+(%d+)$')
+        if not ipstr then
+            ipstr = string.match(params, '^(%d+%.%d+%.%d+%.%d+)$')
+        end
+        if not ipstr or not lib_ip.is_valid_ip(ipstr) then
+            return false, 'invalid arguments'
+        end
+        local ipint = lib_ip.ipstr_to_ipint(ipstr)
+        local rows = data.get_ip_status_log(ipint)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        local starti
+        if numberstr then
+            local number = tonumber(numberstr)
+            starti = math.max(1, #rows - number)
+        else
+            starti = 1
+        end
+        for index = starti,#rows do
+            local row = rows[index]
+            local message = ('%s: %s set status to %s.'):format(os.date("%c", row.timestamp), row.executor, row.status)
+            local reason = row.reason
+            if reason and reason ~= '' then
+                message = ('%s Reason: %s'):format(message, reason)
+            end
+            local expires = row.expires
+            if expires then
+                message = ('%s Expires: %s'):format(message, os.date("%c", expires))
+            end
+            minetest.chat_send_player(caller, message)
+        end
+        return true
     end
 })
 
@@ -765,7 +1108,42 @@ register_chatcommand('asn_status_log', {
     description='shows the status log of an ASN',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local asnstr, numberstr = string.match(params, '^A?(%d+)%s+(%d+)$')
+        if not asnstr then
+            asnstr = string.match(params, '^A?(%d+)$')
+        end
+        if not asnstr then
+            return false, 'invalid arguments'
+        end
+        local asn = tonumber(asnstr)
+        local rows = data.get_asn_status_log(asn)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        local starti
+        if numberstr then
+            local number = tonumber(numberstr)
+            starti = math.max(1, #rows - number)
+        else
+            starti = 1
+        end
+        for index = starti,#rows do
+            local row = rows[index]
+            local message = ('%s: %s set status to %s.'):format(os.date("%c", row.timestamp), row.executor, row.status)
+            local reason = row.reason
+            if reason and reason ~= '' then
+                message = ('%s Reason: %s'):format(message, reason)
+            end
+            local expires = row.expires
+            if expires then
+                message = ('%s Expires: %s'):format(message, os.date("%c", expires))
+            end
+            minetest.chat_send_player(caller, message)
+        end
+        return true
     end
 })
 
@@ -816,7 +1194,35 @@ register_chatcommand('inspect_player', {
     description='list ips, asns and statuses associated with a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local name = params:match('^([a-zA-Z0-9_-]+)$')
+        if not name or name:len() > 20 then
+            return false, 'Invalid argument'
+        end
+        local player_id = data.get_player_id(name)
+        if not player_id then
+            return false, 'Unknown player'
+        end
+        local rows = data.get_player_associations(player_id)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        minetest.chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
+        for _, row in ipairs(rows) do
+            local ipstr = lib_ip.ipint_to_ipstr(row.ipint)
+            local asn_description = lib_asn.get_description(row.asn)
+            local message = ('%s<%s> A%s (%s) <%s>'):format(
+                ipstr,
+                row.ip_status or data.ip_status.default.name,
+                row.asn,
+                asn_description,
+                row.asn_status or data.asn_status.default.name
+            )
+            minetest.chat_send_player(caller, message)
+        end
+        return true
     end
 })
 
@@ -825,7 +1231,27 @@ register_chatcommand('inspect_ip', {
     description='list player accounts and statuses associated with an IP',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        local ipstr = params:match('^(%d+%.%d+%.%d+%.%d+)$')
+        if not ipstr or not lib_ip.is_valid_ip(ipstr) then
+            return false, 'Invalid argument'
+        end
+        local ipint = lib_ip.ipstr_to_ipint(ipstr)
+        local rows = data.get_ip_associations(ipint)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        minetest.chat_send_player(caller, ('Records for %s'):format(ipstr))
+        for _, row in ipairs(rows) do
+            local message = ('% 20s: %s'):format(
+                row.player_name,
+                row.player_status_name or data.player_status.default.name
+            )
+            minetest.chat_send_player(caller, message)
+        end
+        return true
     end
 })
 
