@@ -14,7 +14,7 @@ local safe = verbana.util.safe
 local safe_kick_player = verbana.util.safe_kick_player
 
 local function register_chatcommand(name, def)
-    if debug_mode then name = ('verbana_%s'):format(name) end
+    if debug_mode then name = ('%s_%s'):format(verbana.modname, name) end
     def.func = safe(def.func)
     minetest.register_chatcommand(name, def)
 end
@@ -22,6 +22,7 @@ end
 local function override_chatcommand(name, def)
     def.func = safe(def.func)
     if debug_mode then
+        name = ('%s_%s'):format(verbana.modname, name)
         minetest.register_chatcommand(name, def)
     else
         minetest.override_chatcommand(name, def)
@@ -32,13 +33,15 @@ register_chatcommand('import_sban', {
     params='<filename>',
     description='import records from sban',
     privs={[admin_priv]=true},
-    func=function (_, filename)
+    func=function (caller, filename)
         if not filename or filename == '' then
             filename = minetest.get_worldpath() .. '/sban.sqlite'
         end
         if not io.open(filename, 'r') then
             return false, ('Could not open file %q.'):format(filename)
-        elseif data.import_from_sban(filename) then
+        end
+        minetest.chat_send_player(caller, 'Importing SBAN. This can take a while...')
+        if data.import_from_sban(filename) then
             return true, 'Successfully imported.'
         else
             return false, 'Error importing SBAN db (see server log)'
@@ -73,8 +76,8 @@ register_chatcommand('get_asn', {
         return true, ('A%u (%s)'):format(asn, description)
     end
 })
-
-local function parse_status_params(params)
+----------------- SET PLAYER STATUS COMMANDS -----------------
+local function parse_player_status_params(params)
     local name, reason = params:match('^([a-zA-Z0-9_-]+)%s+(.*)$')
     if not name then
         name = params:match('^([a-zA-Z0-9_-]+)$')
@@ -90,7 +93,7 @@ local function parse_status_params(params)
     return player_id, name, player_status, reason
 end
 
-local function parse_timed_status_params(params)
+local function parse_timed_player_status_params(params)
     local name, timespan_str, reason = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)%s+(.*)$')
     if not name then
         name, timespan_str = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)$')
@@ -111,29 +114,29 @@ local function parse_timed_status_params(params)
     return player_id, name, player_status, expires, reason
 end
 
-local function has_suspicious_connection(player_name)
-    local connection_log = data.get_player_connection_log(player_name, 1)
+local function has_suspicious_connection(player_id)
+    local connection_log = data.get_player_connection_log(player_id, 1)
     if not connection_log or #connection_log ~= 1 then
-        log('warning', 'player %s exists but has no connection log?', player_name)
+        log('warning', 'player %s exists but has no connection log?', player_id)
         return true
     end
     local last_login = connection_log[1]
     if last_login.ip_status_id == data.ip_status.trusted.id then
         return false
-    elseif last_login.ip_status_id ~= data.ip_status.default.id then
+    elseif last_login.ip_status_id and last_login.ip_status_id ~= data.ip_status.default.id then
         return true
     elseif last_login.asn_status_id == data.asn_status.default.id then
         return false
     end
     return true
 end
------------------ SET PLAYER STATUS COMMANDS -----------------
+
 register_chatcommand('verify', {
     params='<name> [<reason>]',
     description='verify a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -145,7 +148,7 @@ register_chatcommand('verify', {
             return false, 'ERROR: could not get executor ID?'
         end
         local status_id
-        if has_suspicious_connection(player_name) then
+        if has_suspicious_connection(player_id) then
             status_id = data.player_status.suspicious.id
         else
             status_id = data.player_status.default.id
@@ -178,7 +181,7 @@ register_chatcommand('unverify', {
     description='unverify a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -221,7 +224,7 @@ override_chatcommand('kick', {
     description='kick a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, _, reason = parse_status_params(params)
+        local player_id, player_name, _, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -229,7 +232,6 @@ override_chatcommand('kick', {
 		if not player then
 			return false, ("Player %s not in game!"):format(player_name)
         end
-        log('action', 'kicking %s...', player_name)
         safe_kick_player(caller, player, reason)
         local executor_id = data.get_player_id(caller)
         if not executor_id then
@@ -252,7 +254,7 @@ register_chatcommand('lock', {
     description='lock a player\'s account',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -289,7 +291,7 @@ register_chatcommand('unlock', {
     description='unlock a player\'s account',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -301,7 +303,7 @@ register_chatcommand('unlock', {
             return false, 'ERROR: could not get executor ID?'
         end
         local status_id
-        if has_suspicious_connection(player_name) then
+        if has_suspicious_connection(player_id) then
             status_id = data.player_status.suspicious.id
         else
             status_id = data.player_status.default.id
@@ -323,7 +325,7 @@ override_chatcommand('ban', {
     description='ban a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -366,7 +368,7 @@ register_chatcommand('tempban', {
     description='ban a player for a length of time',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, expires, reason = parse_timed_status_params(params)
+        local player_id, player_name, player_status, expires, reason = parse_timed_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -404,7 +406,7 @@ override_chatcommand('unban', {
     description='unban a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -419,7 +421,7 @@ override_chatcommand('unban', {
             return false, 'ERROR: could not get executor ID?'
         end
         local status_id
-        if has_suspicious_connection(player_name) then
+        if has_suspicious_connection(player_id) then
             status_id = data.player_status.suspicious.id
         else
             status_id = data.player_status.default.id
@@ -441,7 +443,7 @@ register_chatcommand('whitelist', {
     description='whitelist a player',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -474,7 +476,7 @@ register_chatcommand('unwhitelist', {
     description='whitelist a player',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -502,7 +504,7 @@ register_chatcommand('suspect', {
     description='mark a player as suspicious',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -533,7 +535,7 @@ register_chatcommand('unsuspect', {
     description='unmark a player as suspicious',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_status_params(params)
+        local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
@@ -555,19 +557,147 @@ register_chatcommand('unsuspect', {
         return true, ('Unsuspected %s'):format(player_name)
     end
 })
------------------ SET IP/ASN STATUS COMMANDS -----------------
-register_chatcommand('set_ip_status', {
-    params='<asn> <status>',
-    description='set the status of an IP (default, dangerous, blocked)',
+----------------- SET IP STATUS COMMANDS -----------------
+local function parse_ip_status_params(params)
+    local ipstr, reason = params:match('^(%d+%.%d+%.%d+%.%d+)%s+(.*)$')
+    if not ipstr then
+        ipstr = params:match('^(%d+%.%d+%.%d+%.%d+)$')
+    end
+    if not ipstr or not lib_ip.is_valid_ip(ipstr) then
+        return nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+    end
+    local ipint = lib_ip.ipstr_to_ipint(ipstr)
+    data.register_ip(ipint)
+    local ip_status = data.get_ip_status(ipint, true)
+    return ipint, ip_status, reason
+end
+
+local function parse_timed_ip_status_params(params)
+--    TODO
+--    local name, timespan_str, reason = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)%s+(.*)$')
+--    if not name then
+--        name, timespan_str = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)$')
+--    end
+--    if not name or name:len() > 20 then
+--        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+--    end
+--    local timespan = verbana.util.parse_time(timespan_str)
+--    if not timespan then
+--        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
+--    end
+--    local player_id = data.get_player_id(name)
+--    if not player_id then
+--        return nil, nil, nil, nil, ('Unknown player: %s'):format(name)
+--    end
+--    local player_status = data.get_player_status(player_id, true)
+--    local expires = os.time() + timespan
+--    return player_id, name, player_status, expires, reason
+end
+
+
+
+register_chatcommand('trust_ip', {
+    params='<ip> [reason]',
+    description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
         return false, 'TODO: implement'  -- TODO
     end
 })
 
-register_chatcommand('set_asn_status', {
-    params='<asn> <status>',
-    description='set the status of an ASN (default, dangerous, blocked)',
+register_chatcommand('untrust_ip', {
+    params='<ip> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('suspect_ip', {
+    params='<ip> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('unsuspect_ip', {
+    params='<ip> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('block_ip', {
+    params='<ip> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('tempblock_ip', {
+    params='<ip> <timespan> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('unblock_ip', {
+    params='<ip> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+----------------- SET ASN STATUS COMMANDS -----------------
+register_chatcommand('suspect_asn', {
+    params='<asn> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('unsuspect_asn', {
+    params='<asn> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('block_asn', {
+    params='<asn> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('tempblock_asn', {
+    params='<asn> [reason]',
+    description='',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        return false, 'TODO: implement'  -- TODO
+    end
+})
+
+register_chatcommand('unblock_asn', {
+    params='<asn> [reason]',
+    description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
         return false, 'TODO: implement'  -- TODO
@@ -670,9 +800,9 @@ register_chatcommand('login_record', {
                 os.date("%c", row.timestamp),
                 (rows.success and ' failed!') or '',
                 lib_ip.ipint_to_ipstr(row.ipint),
-                row.ip_status_name,
+                row.ip_status_name or data.ip_status.default.name,
                 row.asn,
-                row.asn_status_name,
+                row.asn_status_name or data.asn_status.default.name,
                 lib_asn.get_description(row.asn)
             )
             minetest.chat_send_player(caller, message)
@@ -704,10 +834,63 @@ register_chatcommand('inspect_asn', {
     description='list player accounts and statuses associated with an ASN',
     privs={[mod_priv]=true},
     func=function(caller, params)
-        return false, 'TODO: implement'  -- TODO
+        -- TODO: this generates a ton of output. need a way to page through it...
+        local asn = params:match('^A?(%d+)$')
+        if not asn then
+            return false, 'Invalid argument'
+        end
+        asn = tonumber(asn)
+        local description = lib_asn.get_description(asn)
+        local rows = data.get_asn_associations(asn)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        minetest.chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
+        for _, row in ipairs(rows) do
+            local message = ('% 20s: %s'):format(
+                row.player_name,
+                row.player_status_name or data.player_status.default.name
+            )
+            minetest.chat_send_player(caller, message)
+        end
+        return true
     end
 })
 
+register_chatcommand('player_cluster', {
+    params='<player_name>',
+    description='Get a list of other players who have ever shared an IP w/ the given player',
+    privs={[mod_priv]=true},
+    func=function(caller, params)
+        local player_name = params:match('^([a-zA-Z0-9_-]+)$')
+        if not player_name or player_name:len() > 20 then
+            return false, 'Invalid argument'
+        end
+        local player_id = data.get_player_id(player_name)
+        if not player_id then
+            return false, 'Unknown player'
+        end
+        local rows = data.get_player_cluster(player_id)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        for _, row in ipairs(rows) do
+            local message = ('% 20s: %s'):format(
+                row.player_name,
+                row.player_status_name or data.player_status.default.name
+            )
+            minetest.chat_send_player(caller, message)
+        end
+        return true
+    end
+})
+--
 
 -- TODO: alias (for listing an account's primary, cascade status)
 -- TODO: list recent bans/kicks/locks/etc

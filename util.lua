@@ -64,11 +64,12 @@ end
 function verbana.util.safe(func)
     -- wrap a function w/ logic to avoid crashing the game
     return function(...)
-        local status, out = pcall(func, ...)
-        if status then
-            return out
+        local rvs = {xpcall(func, debug.traceback, ...)}
+        if rvs[1] then
+            table.remove(rvs, 1)
+            return unpack(rvs)
         else
-            verbana.log('error', 'Error (func): %s', out)
+            verbana.log('error', 'Caught error: %s', rvs[2])
             return nil
         end
     end

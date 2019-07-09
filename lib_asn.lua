@@ -125,12 +125,12 @@ function verbana.lib_asn.lookup(ipstr)
     end
     local asn = find(ipint)
     if asn then
-        return asn, (verbana.lib_asn.description[asn] or 'Not a known ASN')
+        return asn, (verbana.lib_asn.description[asn] or 'Unlisted ASN')
     else
-        return 0, 'Not a known ASN'
+        return 0, 'No known ASN'
     end
 end
 
 function verbana.lib_asn.get_description(asn)
-    return verbana.lib_asn.description[asn] or 'Not a known ASN'
+    return verbana.lib_asn.description[asn] or 'No known ASN'
 end

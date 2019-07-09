@@ -84,7 +84,9 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
 
     local player_id = data.get_player_id(name, true) -- will create one if none exists
     local player_status = data.get_player_status(player_id, true)
+    data.register_ip(ipint)
     local ip_status = data.get_ip_status(ipint, true) -- will create one if none exists
+    data.register_asn(asn)
     local asn_status = data.get_asn_status(asn, true) -- will create one if none exists
 
     -- check and clear temporary statuses
@@ -295,5 +297,7 @@ minetest.register_on_auth_fail(safe(function(name, ipstr)
     local asn = lib_asn.lookup(ipint)
     local player_id = data.get_player_id(name, true) -- will create one if none exists
 
+    data.register_ip(ipint)
+    data.register_asn(asn)
     data.log(player_id, ipint, asn, false)
 end))
