@@ -289,10 +289,16 @@ function verbana.data.get_player_id(name, create_if_new)
     local cached_id = player_id_cache[name]
     if cached_id then return cached_id end
     if create_if_new then
-        if not execute_bind_one('INSERT OR IGNORE INTO player (name) VALUES (?)', 'insert player', name) then return nil end
+        if not execute_bind_one('INSERT OR IGNORE INTO player (name) VALUES (?)', 'insert player', name) then
+            log('warning', 'data.get_player_id: failed to create ID for player %s', name)
+            return nil
+        end
     end
     local table = get_full_table('SELECT id FROM player WHERE name = ? LIMIT 1', 'get player id', name)
-    if not (table and table[1]) then return nil end
+    if not (table and table[1]) then
+        log('warning', 'data.get_player_id: failed to retrieve ID for player %s; %s', name, create_if_new)
+        return nil
+    end
     player_id_cache[name] = table[1][1]
     return table[1][1]
 end

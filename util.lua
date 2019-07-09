@@ -61,7 +61,7 @@ end
 --    local TODO = 1 / nil
 --end
 
-function verbana.util.safe(func)
+function verbana.util.safe(func, rv_on_fail)
     -- wrap a function w/ logic to avoid crashing the game
     return function(...)
         local rvs = {xpcall(func, debug.traceback, ...)}
@@ -70,7 +70,7 @@ function verbana.util.safe(func)
             return unpack(rvs)
         else
             verbana.log('error', 'Caught error: %s', rvs[2])
-            return nil
+            return rv_on_fail
         end
     end
 end

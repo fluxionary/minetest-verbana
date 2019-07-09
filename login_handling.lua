@@ -83,6 +83,11 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     local asn, asn_description = lib_asn.lookup(ipint)
 
     local player_id = data.get_player_id(name, true) -- will create one if none exists
+    if not player_id then
+        log('error', 'could not retrieve or create id for player %s', name)
+        return  -- let them in... it's not their fault :\
+    end
+
     local player_status = data.get_player_status(player_id, true)
     data.register_ip(ipint)
     local ip_status = data.get_ip_status(ipint, true) -- will create one if none exists
@@ -228,20 +233,50 @@ local function move_to(name, pos, max_tries)
     f()
 end
 
+local function fumble_about_for_an_ip(name, player_id)
+    -- for some reason, get_player_ip is unreliable during register_on_newplayer
+    local ipstr = minetest.get_player_ip(name)
+    if not ipstr then
+        local info = minetest.get_player_information(name)
+        if info then
+            ipstr = info.address
+        end
+    end
+    if not ipstr then
+        local connection_log = data.get_player_connection_log(player_id, 1)
+        if not connection_log or #connection_log ~= 1 then
+            log('warning', 'player %s exists but has no connection log?', player_id)
+        else
+            local last_login = connection_log[1]
+            ipstr = lib_ip.ipint_to_ipstr(last_login.ipint)
+        end
+    end
+    return ipstr
+end
+
 minetest.register_on_newplayer(safe(function(player)
     local name = player:get_player_name()
-    local ipstr = minetest.get_player_ip(name)
-    local ipint = lib_ip.ipstr_to_ipint(ipstr)
-    local asn = lib_asn.lookup(ipint)
     local player_id = data.get_player_id(name)
-    local ip_status = data.get_ip_status(ipint)
-    local asn_status = data.get_asn_status(asn)
 
-    local need_to_verify = (
-        settings.universal_verification or
-        ip_status.name == 'suspicious' or
-        (asn_status.name == 'suspicious' and ip_status.name ~= 'trusted')
-    )
+    local ipstr = fumble_about_for_an_ip(name, player_id)
+    local need_to_verify
+    if not ipstr then
+        -- if we can't figure out where they're coming from, force verification
+        log('warning', 'could not discover an IP for new player %s; forcing verification', name)
+        need_to_verify = true
+    else
+        local ipint = lib_ip.ipstr_to_ipint(ipstr)
+        local ip_status = data.get_ip_status(ipint)
+
+        local asn = lib_asn.lookup(ipint)
+        local asn_status = data.get_asn_status(asn)
+
+        need_to_verify = (
+            settings.universal_verification or
+            ip_status.name == 'suspicious' or
+            (asn_status.name == 'suspicious' and ip_status.name ~= 'trusted')
+        )
+    end
 
     if need_to_verify then
         if not data.set_player_status(player_id, data.verbana_player_id, data.player_status.unverified.id, 'new player connected from suspicious network') then
