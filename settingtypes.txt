@@ -20,7 +20,7 @@ verbana.unverified_privs (Privs for unverified users) string shout
 verbana.whitelisted_privs (Privs required to bypass suspicious network checks) string
 
 # Coordinates where unverified players spawn
-verbana.unverified_spawn_pos (Where unverified players spawn) string 0,0,0
+verbana.unverified_spawn_pos (Where unverified players spawn) string (0,0,0)
 
 # Coordinates bounding the verification jail area, if it exists.
 # Format: (x1,y1,z1),(x2,y2,z2)

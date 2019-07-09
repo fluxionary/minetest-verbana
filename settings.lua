@@ -25,10 +25,10 @@ local function get_jail_bounds()
         return nil
     end
     local x1, y1, z1, x2, y2, z2 = bounds:match(
-        '^%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%),%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%)%s*$'
+        '^%s*%(%s*(%-?%d+)%s*,%s*(%-?%d+)%s*,%s*(%-?%d+)%s*%),%(%s*(%-?%d+)%s*,%s*(%-?%d+)%s*,%s*(%-?%d+)%s*%)%s*$'
     )
     if not x1 then
-        verbana.log('warning', 'The setting of verbana.jail_bounds %q is invalid, ignoring.')
+        verbana.log('warning', 'The setting of verbana.jail_bounds %q is invalid, ignoring.', bounds)
         return nil
     end
     x1 = tonumber(x1)
