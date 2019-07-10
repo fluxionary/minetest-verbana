@@ -233,32 +233,11 @@ local function move_to(name, pos, max_tries)
     f()
 end
 
-local function fumble_about_for_an_ip(name, player_id)
-    -- for some reason, get_player_ip is unreliable during register_on_newplayer
-    local ipstr = minetest.get_player_ip(name)
-    if not ipstr then
-        local info = minetest.get_player_information(name)
-        if info then
-            ipstr = info.address
-        end
-    end
-    if not ipstr then
-        local connection_log = data.get_player_connection_log(player_id, 1)
-        if not connection_log or #connection_log ~= 1 then
-            log('warning', 'player %s exists but has no connection log?', player_id)
-        else
-            local last_login = connection_log[1]
-            ipstr = lib_ip.ipint_to_ipstr(last_login.ipint)
-        end
-    end
-    return ipstr
-end
-
 minetest.register_on_newplayer(safe(function(player)
     local name = player:get_player_name()
     local player_id = data.get_player_id(name)
 
-    local ipstr = fumble_about_for_an_ip(name, player_id)
+    local ipstr = data.fumble_about_for_an_ip(name, player_id)
     local need_to_verify
     if not ipstr then
         -- if we can't figure out where they're coming from, force verification

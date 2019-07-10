@@ -960,7 +960,7 @@ register_chatcommand('tempblock_asn', {
         if not verbana.util.table_contains({
                 data.asn_status.default.id,
                 data.asn_status.suspicious.id,
-            }, ip_status.status_id) then
+            }, asn_status.status_id) then
             return false, ('Cannot block ASN w/ status %s'):format(asn_status.name)
         end
         local executor_id = data.get_player_id(caller)
@@ -986,7 +986,7 @@ register_chatcommand('unblock_asn', {
     description='',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        local asn, description, asn_status, expires, reason = parse_timed_asn_status_params(params)
+        local asn, description, asn_status, reason = parse_asn_status_params(params)
         if not asn then
             return false, reason
         end
@@ -1209,7 +1209,7 @@ register_chatcommand('inspect_player', {
         if #rows == 0 then
             return true, 'No records found.'
         end
-        minetest.chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
+        minetest.chat_send_player(caller, ('Records for %s'):format(name))
         for _, row in ipairs(rows) do
             local ipstr = lib_ip.ipint_to_ipstr(row.ipint)
             local asn_description = lib_asn.get_description(row.asn)
@@ -1317,6 +1317,36 @@ register_chatcommand('player_cluster', {
     end
 })
 --
+register_chatcommand('who2', {
+    description='Show current connected players, statuses, and sources',
+    privs={[mod_priv]=true},
+    func=function(caller, params)
+        for _, player in ipairs(minetest.get_connected_players()) do
+            local name = player:get_player_name()
+            local player_id = data.get_player_id(name)
+            local player_status = data.get_player_status(player_id)
+
+            local ipstr = verbana.data.fumble_about_for_an_ip(name, player_id)
+            local ipint = lib_ip.ipstr_to_ipint(ipstr)
+            local ip_status = data.get_ip_status(ipint)
+
+            local asn, asn_description = lib_asn.lookup(ipint)
+            local asn_status = data.get_asn_status(asn)
+
+            local message = ('% 20s (%s) %s (%s) A%s (%s) %s'):format(
+                name,
+                player_status.name,
+                ipstr,
+                ip_status.name,
+                asn,
+                asn_status.name,
+                asn_description
+            )
+            minetest.chat_send_player(caller, message)
+        end
+        return true
+    end
+})
 
 -- TODO: alias (for listing an account's primary, cascade status)
 -- TODO: list recent bans/kicks/locks/etc

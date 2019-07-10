@@ -645,10 +645,10 @@ function verbana.data.get_player_associations(player_id)
              , asn_status.name asn_status
           FROM assoc
           JOIN player         ON player.id == assoc.player_id
-          JOIN ip             ON ip.ip == log.ip
+          JOIN ip             ON ip.ip == assoc.ip
      LEFT JOIN ip_status_log  ON ip.current_status_id == ip_status_log.id
      LEFT JOIN ip_status      ON ip_status_log.status_id == ip_status.id
-          JOIN asn            ON asn.asn == log.asn
+          JOIN asn            ON asn.asn == assoc.asn
      LEFT JOIN asn_status_log ON asn.current_status_id == asn_status_log.id
      LEFT JOIN asn_status     ON asn_status_log.status_id == asn_status.id
          WHERE player.id == ?
@@ -717,4 +717,25 @@ function verbana.data.get_all_banned_players()
         verbana.data.player_status.tempbanned,
         verbana.data.player_status.locked
     )
+end
+
+function verbana.data.fumble_about_for_an_ip(name, player_id)
+    -- for some reason, get_player_ip is unreliable during register_on_newplayer
+    local ipstr = minetest.get_player_ip(name)
+    if not ipstr then
+        local info = minetest.get_player_information(name)
+        if info then
+            ipstr = info.address
+        end
+    end
+    if not ipstr then
+        local connection_log = verbana.data.get_player_connection_log(player_id, 1)
+        if not connection_log or #connection_log ~= 1 then
+            log('warning', 'player %s exists but has no connection log?', player_id)
+        else
+            local last_login = connection_log[1]
+            ipstr = lib_ip.ipint_to_ipstr(last_login.ipint)
+        end
+    end
+    return ipstr
 end
