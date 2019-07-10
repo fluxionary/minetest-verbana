@@ -294,7 +294,7 @@ function verbana.data.get_player_id(name, create_if_new)
             return nil
         end
     end
-    local table = get_full_table('SELECT id FROM player WHERE name = ? LIMIT 1', 'get player id', name)
+    local table = get_full_table('SELECT id FROM player WHERE LOWER(name) == LOWER(?) LIMIT 1', 'get player id', name)
     if not (table and table[1]) then
         log('warning', 'data.get_player_id: failed to retrieve ID for player %s; %s', name, create_if_new)
         return nil
