@@ -1165,7 +1165,7 @@ register_chatcommand('login_record', {
         if not player_id then
             return false, 'unknown player'
         end
-        local rows = data.get_player_connection_log(player_id)
+        local rows = data.get_player_connection_log(player_id, limit)
         if not rows then
             return false, 'An error occurred (see server logs)'
         end

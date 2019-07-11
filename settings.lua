@@ -36,7 +36,7 @@ local function get_jail_bounds()
     z1 = tonumber(z1)
     x2 = tonumber(x2)
     y2 = tonumber(y2)
-    z2 = tonubmer(z2)
+    z2 = tonumber(z2)
     if x1 > x2 then x1, x2 = x2, x1 end
     if y1 > y2 then y1, y2 = y2, y1 end
     if z1 > z2 then z1, z2 = z2, z1 end

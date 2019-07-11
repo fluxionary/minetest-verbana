@@ -63,11 +63,13 @@ if USING_VERIFICATION_JAIL then
             local player_status = data.get_player_status(player_id) -- cached, so not heavy
             if should_rejail(player, player_status) then
                 log('action', 'rejailing %s', name)
+                verbana.chat.tell_mods('%s has escaped verification jail, and is being sent back', name)
                 if not settings.debug_mode then
                     player:set_pos(unverified_spawn_pos)
                 end
             elseif should_unjail(player, player_status) then
                 log('action', 'unjailing %s', name)
+                verbana.chat.tell_mods('%s has been removed from verification jail', name)
                 if not settings.debug_mode then
                     player:set_pos(spawn_pos)
                 end
