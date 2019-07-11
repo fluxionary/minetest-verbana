@@ -1,8 +1,3 @@
-local function table_is_empty(t)
-    for _ in pairs(t) do return false end
-    return true
-end
-
 local data = verbana.data
 local lib_asn = verbana.lib_asn
 local lib_ip = verbana.lib_ip
@@ -13,11 +8,11 @@ local util = verbana.util
 
 local safe = util.safe
 
-local USING_VERIFICATION_JAIL = settings.verification_jail and settings.verification_jail_period
-local verification_jail = settings.verification_jail
 local spawn_pos = settings.spawn_pos
 local unverified_spawn_pos = settings.unverified_spawn_pos
+local verification_jail = settings.verification_jail
 local verification_jail_period = settings.verification_jail_period
+local USING_VERIFICATION_JAIL = verification_jail and verification_jail_period
 
 local check_player_privs = minetest.check_player_privs
 
@@ -121,14 +116,14 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     end
 
     local player_privs = minetest.get_player_privs(name)
-    local is_new_player = table_is_empty(player_privs) and player_status.name == 'unknown'
+    local is_new_player = util.table_is_empty(player_privs) and player_status.name == 'unknown'
 
     local suspicious = false
     local return_value
 
     if player_status.name == 'whitelisted' then
         -- if the player is whitelisted, let them in.
-    elseif settings.whitelisted_privs and minetest.check_player_privs(name, settings.whitelisted_privs) then
+    elseif settings.whitelisted_privs and check_player_privs(name, settings.whitelisted_privs) then
         -- if the player has a whitelisted priv, let them in.
     elseif player_status.name == 'banned' then
         local reason = player_status.reason

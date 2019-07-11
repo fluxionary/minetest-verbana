@@ -88,3 +88,9 @@ function verbana.util.safe_kick_player(caller, player, reason)
         end
     end
 end
+
+function verbana.util.table_is_empty(t)
+    for _ in pairs(t) do return false end
+    return true
+end
+

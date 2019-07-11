@@ -1,5 +1,3 @@
-if not verbana then verbana = {} end
-
 verbana.lib_ip = {}
 
 function verbana.lib_ip.is_valid_ip(ipstr)

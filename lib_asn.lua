@@ -34,6 +34,10 @@ end
 verbana.lib_asn.network = {}
 
 local function refresh_asn_table()
+    -- format of source file: IP/NET ASN
+    -- source file is assumed to be sorted
+    -- source file may have overlapping networks corresponding to subleases;
+    --   extra logic is used to resolve these overlaps.
     local contents = load_file(settings.asn_data_path)
     if not contents then return end
 

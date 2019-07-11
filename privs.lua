@@ -1,4 +1,3 @@
-if not verbana then verbana = {} end
 verbana.privs = {}
 
 verbana.privs.admin = verbana.settings.admin_priv
