@@ -285,12 +285,16 @@ minetest.register_on_joinplayer(safe(function(player)
     local name = player:get_player_name()
     local player_id = data.get_player_id(name)
     local player_status = data.get_player_status(player_id)
-    local ipstr = minetest.get_player_ip(name)
-    local ipint = lib_ip.ipstr_to_ipint(ipstr)
-    local asn, asn_description = lib_asn.lookup(ipint)
     local is_unverified = player_status.status_id == data.player_status.unverified.id
-    if is_unverified then
-        verbana.chat.tell_mods(('*** Player %s from A%s (%s) is unverified.'):format(name, asn, asn_description))
+    local ipstr = data.fumble_about_for_an_ip(name)
+    if ipstr then
+        local ipint = lib_ip.ipstr_to_ipint(ipstr)
+        local asn, asn_description = lib_asn.lookup(ipint)
+        if is_unverified then
+            verbana.chat.tell_mods(('*** Player %s from A%s (%s) is unverified.'):format(name, asn, asn_description))
+        end
+    else
+        verbana.chat.tell_mods(('*** Player %s is unverified.'):format(name))
     end
     if USING_VERIFICATION_JAIL then
         if should_rejail(player, player_status) then
