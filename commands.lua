@@ -819,7 +819,7 @@ local function parse_asn_status_params(params)
         return nil, nil, nil, ('Invalid argument(s): %q'):format(params)
     end
     local asn = tonumber(asnstr)
-    local description = lib_asn.verbana.get_description(asn)
+    local description = lib_asn.get_description(asn)
     if description == lib_asn.invalid_asn_description then
         return nil, nil, nil, ('Not a valid ASN: %q'):format(params)
     end
@@ -837,7 +837,7 @@ local function parse_timed_asn_status_params(params)
         return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
     end
     local asn = tonumber(asnstr)
-    local description = lib_asn.verbana.get_description(asn)
+    local description = lib_asn.get_description(asn)
     if description == lib_asn.invalid_asn_description then
         return nil, nil, nil, ('Not a valid ASN: %q'):format(params)
     end
@@ -850,7 +850,6 @@ local function parse_timed_asn_status_params(params)
     local expires = os.time() + timespan
     return asn, description, asn_status, expires, reason
 end
-
 
 register_chatcommand('suspect_asn', {
     params='<asn> [reason]',
