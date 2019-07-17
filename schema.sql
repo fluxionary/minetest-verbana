@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS player_status_log (
   , status_id   INTEGER NOT NULL
   , timestamp   INTEGER NOT NULL
   , reason      TEXT
-  , expires     INTEGER  -- only meaningful for temp bans
+  , expires     INTEGER
   , FOREIGN KEY (executor_id) REFERENCES player(id)
   , FOREIGN KEY (player_id) REFERENCES player(id)
   , FOREIGN KEY (status_id) REFERENCES player_status(id)
@@ -123,8 +123,17 @@ CREATE TABLE IF NOT EXISTS assoc (
   , FOREIGN KEY (ip)        REFERENCES ip(ip)
   , FOREIGN KEY (asn)       REFERENCES asn(asn)
 );
-  CREATE        INDEX IF NOT EXISTS assoc_player ON assoc(player_id);
-  CREATE        INDEX IF NOT EXISTS assoc_ip     ON assoc(ip);
-  CREATE        INDEX IF NOT EXISTS assoc_asn    ON assoc(asn);
+  CREATE INDEX IF NOT EXISTS assoc_player ON assoc(player_id);
+  CREATE INDEX IF NOT EXISTS assoc_ip     ON assoc(ip);
+  CREATE INDEX IF NOT EXISTS assoc_asn    ON assoc(asn);
 -- END LOGS AND ASSOCIATIONS
+-- REPORTS
+CREATE TABLE IF NOT EXISTS report (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT
+  , reporter_id INTEGER NOT NULL
+  , report      TEXT NOT NULL
+  , FOREIGN KEY (reporter_id) REFERENCES player(id)
+);
+  CREATE INDEX IF NOT EXISTS report_reporter ON report(reporter_id);
+-- END REPORTS
 PRAGMA foreign_keys = ON;

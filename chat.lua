@@ -27,7 +27,7 @@ table.insert(minetest.registered_on_chat_messages, 1,
     function(name, message)
         local player_id = data.get_player_id(name)
         local player_status = data.get_player_status(player_id)
-        local is_unverified = player_status.status_id == data.player_status.unverified.id
+        local is_unverified = player_status.id == data.player_status.unverified.id
         if is_unverified then
             local cmsg = ('[unverified] <%s> %s'):format(name, message)
             verbana.chat.tell_mods(cmsg)

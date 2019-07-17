@@ -17,7 +17,7 @@ local USING_VERIFICATION_JAIL = verification_jail and verification_jail_period
 local check_player_privs = minetest.check_player_privs
 
 local function should_rejail(player, player_status)
-    if player_status.status_id ~= data.player_status.unverified.id then
+    if player_status.id ~= data.player_status.unverified.id then
         return false
     end
     local pos = player:get_pos()
@@ -29,7 +29,7 @@ local function should_rejail(player, player_status)
 end
 
 local function should_unjail(player, player_status)
-    if player_status.status_id == data.player_status.unverified.id then
+    if player_status.id == data.player_status.unverified.id then
         return false
     elseif privs.is_privileged(player:get_player_name()) then
         return false
@@ -85,7 +85,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
         return  -- let them in... it's not their fault :\
     end
 
-    local player_status = data.get_player_status(player_id, true)
+    local player_status, is_new_player = data.get_player_status(player_id, true)
     data.register_ip(ipint)
     local ip_status = data.get_ip_status(ipint, true) -- will create one if none exists
     data.register_asn(asn)
@@ -93,97 +93,80 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
 
     -- check and clear temporary statuses
     local now = os.time()
-    if player_status.name == 'tempbanned' then
-        local expires = player_status.expires or now
-        if now >= expires then
-            data.unban_player(player_id, player_status.executor_id, 'temp ban expired')
-            player_status = data.get_player_status(player_id) -- refresh player status
-        end
+    if player_status.id == data.player_status.banned.id and player_status.expires and now >= player_status.expires then
+        data.set_player_status(player_id, player_status.executor_id, data.player_status.suspicious.id, 'temp ban expired')
+        player_status = data.get_player_status(player_id) -- refresh player status
     end
-    if ip_status.name == 'tempblocked' then
-        local expires = ip_status.expires or now
-        if now >= expires then
-            data.unblock_ip(ipint, ip_status.executor_id, 'temp block expired')
-            ip_status = data.get_ip_status(ipint) -- refresh ip status
-        end
+    if ip_status.id == data.ip_status.blocked.id and ip_status.expires and now >= ip_status.expires then
+        data.set_ip_status(ipint, ip_status.executor_id, data.ip_status.suspicious.id, 'temp block expired')
+        ip_status = data.get_ip_status(ipint) -- refresh ip status
     end
-    if asn_status.name == 'tempblocked' then
-        local expires = asn_status.expires or now
-        if now >= expires then
-            data.unblock_asn(asn, asn_status.executor_id, 'temp block expired')
-            asn_status = data.get_asn_status(asn) -- refresh asn status
-        end
+    if asn_status.id == data.asn_status.blocked.id and asn_status.expires and now >= asn_status.expires then
+        data.set_asn_status(asn, asn_status.executor_id, data.asn_status.suspicious.id, 'temp block expired')
+        asn_status = data.get_asn_status(asn) -- refresh asn status
     end
 
-    local player_privs = minetest.get_player_privs(name)
-    local is_new_player = util.table_is_empty(player_privs) and player_status.name == 'unknown'
-
+    -- figure out if the player is suspicious or should be outright rejected
     local suspicious = false
     local return_value
 
-    if player_status.name == 'whitelisted' then
+    if player_status.id == data.player_status.whitelisted.id then
         -- if the player is whitelisted, let them in.
     elseif settings.whitelisted_privs and check_player_privs(name, settings.whitelisted_privs) then
         -- if the player has a whitelisted priv, let them in.
-    elseif player_status.name == 'banned' then
-        local reason = player_status.reason
-        if reason and reason ~= '' then
-            return_value = ('Account %q is banned because %q.'):format(name, reason)
-        else
-            return_value = ('Account %q is banned.'):format(name)
-        end
-    elseif player_status.name == 'locked' then
-        local reason = player_status.reason
-        if reason and reason ~= '' then
-            return_value = ('Account %q is locked because %q.'):format(name, reason)
-        else
-            return_value = ('Account %q is locked.'):format(name)
-        end
-    elseif player_status.name == 'tempbanned' then
-        local expires = os.date("%c", player_status.expires or now)
-        local reason = player_status.reason
-        if reason and reason ~= '' then
-            return_value = ('Account %q is banned until %s because %q.'):format(name, expires, reason)
-        else
-            return_value = ('Account %q is banned until %s.'):format(name, expires)
-        end
-    elseif ip_status.name == 'trusted' then
+    elseif ip_status.id == data.ip_status.trusted.id then
         -- let them in
-    elseif ip_status.name == 'suspicious' then
+    elseif ip_status.id == data.ip_status.suspicious.id then
         suspicious = true
-    elseif ip_status.name == 'blocked' then
-        local reason = ip_status.reason
-        if reason and reason ~= '' then
-            return_value = ('IP %q is blocked because %q.'):format(ipstr, reason)
+    elseif player_status.id == data.player_status.banned.id then
+        local reason = player_status.reason
+        if player_status.expires then
+            local expires = os.date("%c", player_status.expires or now)
+            if reason and reason ~= '' then
+                return_value = ('Account %q is banned until %s because %q.'):format(name, expires, reason)
+            else
+                return_value = ('Account %q is banned until %s.'):format(name, expires)
+            end
         else
-            return_value = ('IP %q is blocked.'):format(ipstr)
+            if reason and reason ~= '' then
+                return_value = ('Account %q is banned because %q.'):format(name, reason)
+            else
+                return_value = ('Account %q is banned.'):format(name)
+            end
         end
-    elseif ip_status.name == 'tempblocked' then
-        local expires = os.date("%c", ip_status.expires or now)
+    elseif ip_status.id == data.ip_status.blocked.id then
         local reason = ip_status.reason
-        if reason and reason ~= '' then
-            return_value = ('IP %q is blocked until %s because %q.'):format(ipstr, expires, reason)
+        if ip_status.expires then
+            local expires = os.date("%c", ip_status.expires or now)
+            if reason and reason ~= '' then
+                return_value = ('IP %q is blocked until %s because %q.'):format(ipstr, expires, reason)
+            else
+                return_value = ('IP %q is blocked until %s.'):format(ipstr, expires)
+            end
         else
-            return_value = ('IP %q is blocked until %s.'):format(ipstr, expires)
+            if reason and reason ~= '' then
+                return_value = ('IP %q is blocked because %q.'):format(ipstr, reason)
+            else
+                return_value = ('IP %q is blocked.'):format(ipstr)
+            end
         end
-    elseif asn_status.name == 'suspicious' then
+    elseif asn_status.id == data.asn_status.suspicious.id then
         suspicious = true
-    elseif asn_status.name == 'blocked' then
+    elseif asn_status.id == data.asn_status.blocked.id then
         local reason = asn_status.reason
-        if reason and reason ~= '' then
-            return_value = ('Network %s (%s) is blocked because %q.'):format(asn, asn_description, reason)
-        else
-            return_value = ('Network %s (%s) is blocked.'):format(asn, asn_description)
-        end
-    elseif asn_status.name == 'tempblocked' then
+        if asn_status.expires then
         local expires = os.date("%c", asn_status.expires or now)
-        local reason = asn_status.reason
-        if reason and reason ~= '' then
-            return_value = ('Network %s (%s) is blocked until %s because %q.'):format(
-                asn, asn_description, expires, reason
-            )
+            if reason and reason ~= '' then
+                return_value = ('Network %s (%s) is blocked until %s because %q.'):format(asn, asn_description, expires, reason)
+            else
+                return_value = ('Network %s (%s) is blocked until %s.'):format(asn, asn_description, expires)
+            end
         else
-            return_value = ('Network %s (%s) is blocked until %s.'):format(asn, asn_description, expires)
+            if reason and reason ~= '' then
+                return_value = ('Network %s (%s) is blocked because %q.'):format(asn, asn_description, reason)
+            else
+                return_value = ('Network %s (%s) is blocked.'):format(asn, asn_description)
+            end
         end
     end
 
@@ -280,7 +263,7 @@ minetest.register_on_joinplayer(safe(function(player)
     local name = player:get_player_name()
     local player_id = data.get_player_id(name)
     local player_status = data.get_player_status(player_id)
-    local is_unverified = player_status.status_id == data.player_status.unverified.id
+    local is_unverified = player_status.id == data.player_status.unverified.id
     local ipstr = data.fumble_about_for_an_ip(name)
     if ipstr then
         local ipint = lib_ip.ipstr_to_ipint(ipstr)
@@ -291,6 +274,7 @@ minetest.register_on_joinplayer(safe(function(player)
     else
         verbana.chat.tell_mods(('*** Player %s is unverified.'):format(name))
     end
+
     if USING_VERIFICATION_JAIL then
         if should_rejail(player, player_status) then
             log('action', 'rejailing %s', name)

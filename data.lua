@@ -9,28 +9,23 @@ local db = verbana.db
 
 -- constants
 verbana.data.player_status = {
-    unknown={name='unknown', id=1},
-    default={name='default', id=2},
-    unverified={name='unverified', id=3},
-    banned={name='banned', id=4},
-    tempbanned={name='tempbanned', id=5},
-    locked={name='locked', id=6},
-    whitelisted={name='whitelisted', id=7},
-    suspicious={name='suspicious', id=8},
-    kicked={name='kicked', id=9},
+    default={name='default', id=1},
+    suspicious={name='suspicious', id=2},
+    banned={name='banned', id=3},
+    whitelisted={name='whitelisted', id=4},
+    unverified={name='unverified', id=5},
+    kicked={name='kicked', id=6},  -- for logging kicks
 }
 verbana.data.ip_status = {
     default={name='default', id=1},
-    trusted={name='trusted', id=2},
-    suspicious={name='suspicious', id=3},
-    blocked={name='blocked', id=4},
-    tempblocked={name='tempblocked', id=5},
+    suspicious={name='suspicious', id=2},
+    blocked={name='blocked', id=3},
+    trusted={name='trusted', id=4},
 }
 verbana.data.asn_status = {
     default={name='default', id=1},
     suspicious={name='suspicious', id=2},
     blocked={name='blocked', id=3},
-    tempblocked={name='tempblocked', id=4},
 }
 verbana.data.verbana_player = '!verbana!'
 verbana.data.verbana_player_id = 1
@@ -223,7 +218,6 @@ function verbana.data.import_from_sban(filename)
     -- player status --
     local default_player_status_id = verbana.data.player_status.default.id
     local banned_player_status_id = verbana.data.player_status.banned.id
-    local tempbanned_player_status_id = verbana.data.player_status.tempbanned.id
     local insert_player_status_sql = [[
         INSERT OR IGNORE
           INTO player_status_log (executor_id, player_id, status_id, timestamp, reason, expires)
@@ -245,13 +239,7 @@ function verbana.data.import_from_sban(filename)
         else
             unban_source_id = player_id_by_name[u_source]
         end
-        local status_id
-        if expires and type(expires) == 'number' then
-            status_id = tempbanned_player_status_id
-        else
-            status_id = banned_player_status_id
-            expires = nil
-        end
+        local status_id = banned_player_status_id
         -- BAN
         if not bind_and_step(insert_player_status_statement, 'insert player status (ban)', source_id, player_id, status_id, created, reason, expires) then return _error() end
         -- UNBAN
@@ -306,11 +294,11 @@ end
 local player_status_cache = {}
 function verbana.data.get_player_status(player_id, create_if_new)
     local cached_status = player_status_cache[player_id]
-    if cached_status then return cached_status end
+    if cached_status then return cached_status, false end
     local code = [[
         SELECT executor.id   executor_id
              , executor.name executor
-             , status.id     status_id
+             , status.id     id
              , status.name   name
              , log.timestamp timestamp
              , log.reason    reason
@@ -325,24 +313,18 @@ function verbana.data.get_player_status(player_id, create_if_new)
     local table = get_full_ntable(code, 'get player status', player_id)
     if #table == 1 then
         player_status_cache[player_id] = table[1]
-        return table[1]
+        return table[1], false
     elseif #table > 1 then
         log('error', 'somehow got more than 1 result when getting current player status for %s', player_id)
-        return nil
+        return nil, false
     elseif not create_if_new then
-        return nil
+        return nil, nil
     end
-    if not verbana.data.set_player_status(player_id, verbana.data.verbana_player_id, verbana.data.player_status.unknown.id, 'creating initial player status') then
+    if not verbana.data.set_player_status(player_id, verbana.data.verbana_player_id, verbana.data.player_status.default.id, 'creating initial player status') then
         log('error', 'failed to set initial player status')
-        return nil
+        return nil, true
     end
-    return {
-        executor_id=verbana.data.verbana_player_id,
-        executor=verbana.data.verbana_player,
-        status_id=verbana.data.player_status.unknown.id,
-        name='unknown',
-        timestamp=os.time()
-    }
+    return verbana.data.get_player_status(player_id, false), true
 end
 function verbana.data.set_player_status(player_id, executor_id, status_id, reason, expires, no_update_current)
     player_status_cache[player_id] = nil
@@ -371,7 +353,7 @@ function verbana.data.get_ip_status(ipint, create_if_new)
     local code = [[
         SELECT executor.id   executor_id
              , executor.name executor
-             , status.id     status_id
+             , status.id     id
              , status.name   name
              , log.timestamp timestamp
              , log.reason    reason
@@ -397,13 +379,7 @@ function verbana.data.get_ip_status(ipint, create_if_new)
         log('error', 'failed to set initial ip status')
         return nil
     end
-    return {
-        executor_id=verbana.data.verbana_player_id,
-        executor=verbana.data.verbana_player,
-        status_id=verbana.data.ip_status.default.id,
-        name='default',
-        timestamp=os.time()
-    }
+    return verbana.data.get_ip_status(ipint, false)
 end
 function verbana.data.set_ip_status(ipint, executor_id, status_id, reason, expires)
     ip_status_cache[ipint] = nil
@@ -430,7 +406,7 @@ function verbana.data.get_asn_status(asn, create_if_new)
     local code = [[
         SELECT executor.id   executor_id
              , executor.name executor
-             , status.id     status_id
+             , status.id     id
              , status.name   name
              , log.timestamp timestamp
              , log.reason    reason
@@ -456,13 +432,7 @@ function verbana.data.get_asn_status(asn, create_if_new)
         log('error', 'failed to set initial asn status')
         return nil
     end
-    return {
-        executor_id=verbana.data.verbana_player_id,
-        executor=verbana.data.verbana_player,
-        status_id=verbana.data.asn_status.default.id,
-        name='default',
-        timestamp=os.time()
-    }
+    return verbana.data.get_asn_status(asn, false)
 end
 function verbana.data.set_asn_status(asn, executor_id, status_id, reason, expires)
     asn_status_cache[asn] = nil
@@ -710,12 +680,10 @@ function verbana.data.get_all_banned_players()
              , player_status_log.expires   expires
           FROM player
      LEFT JOIN player_status_log ON player.id == player_status_log.player_id
-         WHERE player_status_log.status_id IN (?, ?, ?)
+         WHERE player_status_log.status_id == ?
     ]]
     return get_full_ntable(code, 'all banned',
-        verbana.data.player_status.banned,
-        verbana.data.player_status.tempbanned,
-        verbana.data.player_status.locked
+        verbana.data.player_status.banned
     )
 end
 
@@ -739,3 +707,28 @@ function verbana.data.fumble_about_for_an_ip(name, player_id)
     end
     return ipstr
 end
+
+function verbana.data.get_ban_log(limit)
+    local code = [[
+        SELECT player.name                 player
+             , executor.name               executor
+             , player_status.name          status
+             , player_status_log.reason    timestamp
+             , player_status_log.timestamp reason
+             , player_status_log.expires   expires
+          FROM player_status_log
+          JOIN player            ON player.id == player_status_log.player_id
+          JOIN player executor   ON executor.id == player_status_log.executor_id
+          JOIN player_status     ON player_status.id == player_status_log.status_id
+         WHERE player_status_log.status_id IN (?, ?)
+         ORDER BY player_status_log.timestamp DESC
+         LIMIT ?
+    ]]
+    if not limit or type(limit) ~= 'number' or limit < 0 then limit = 20 end
+    return get_full_ntable(code, 'ban log',
+        verbana.data.player_status.banned.id,
+        verbana.data.player_status.kicked.id,
+        limit
+    )
+end
+

@@ -5,13 +5,16 @@ local lib_asn = verbana.lib_asn
 local lib_ip = verbana.lib_ip
 local log = verbana.log
 local settings = verbana.settings
+local util = verbana.util
 
 local mod_priv = verbana.privs.moderator
 local admin_priv = verbana.privs.admin
 local debug_mode = settings.debug_mode
 
-local safe = verbana.util.safe
-local safe_kick_player = verbana.util.safe_kick_player
+local parse_time = util.parse_time
+local safe = util.safe
+local safe_kick_player = util.safe_kick_player
+local table_contains = util.table_contains
 
 local function register_chatcommand(name, def)
     if debug_mode then name = ('v_%s'):format(name) end
@@ -29,7 +32,12 @@ local function override_chatcommand(name, def)
     end
 end
 
-register_chatcommand('import_sban', {
+local function alias_chatcommand(name, existing_name)
+    if debug_mode then name = ('v_%s'):format(name) end
+
+end
+
+register_chatcommand('sban_import', {
     params='<filename>',
     description='import records from sban',
     privs={[admin_priv]=true},
@@ -49,7 +57,7 @@ register_chatcommand('import_sban', {
     end
 })
 
-register_chatcommand('get_asn', {
+register_chatcommand('asn', {
     params='<name> | <IP>',
     description='get the ASN associated with an IP or player name',
     privs={[mod_priv]=true},
@@ -59,7 +67,7 @@ register_chatcommand('get_asn', {
         if lib_ip.is_valid_ip(name_or_ipstr) then
             ipstr = name_or_ipstr
         else
-            ipstr = minetest.get_player_ip(name_or_ipstr)
+            ipstr = data.fumble_about_for_an_ip(name_or_ipstr)
         end
 
         if not ipstr or ipstr == '' then
@@ -93,27 +101,6 @@ local function parse_player_status_params(params)
     return player_id, name, player_status, reason
 end
 
-local function parse_timed_player_status_params(params)
-    local name, timespan_str, reason = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)%s+(.*)$')
-    if not name then
-        name, timespan_str = params:match('^([a-zA-Z0-9_-]+)%s+(%d+%w)$')
-    end
-    if not name or name:len() > 20 then
-        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
-    end
-    local timespan = verbana.util.parse_time(timespan_str)
-    if not timespan then
-        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
-    end
-    local player_id = data.get_player_id(name)
-    if not player_id then
-        return nil, nil, nil, nil, ('Unknown player: %s'):format(name)
-    end
-    local player_status = data.get_player_status(player_id, true)
-    local expires = os.time() + timespan
-    return player_id, name, player_status, expires, reason
-end
-
 local function has_suspicious_connection(player_id)
     local connection_log = data.get_player_connection_log(player_id, 1)
     if not connection_log or #connection_log ~= 1 then
@@ -132,7 +119,7 @@ local function has_suspicious_connection(player_id)
 end
 
 register_chatcommand('verify', {
-    params='<name> [<reason>]',
+    params='<name> [reason]',
     description='verify a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -140,7 +127,7 @@ register_chatcommand('verify', {
         if not player_id then
             return false, reason
         end
-        if player_status.status_id ~= data.player_status.unverified.id then
+        if player_status.id ~= data.player_status.unverified.id then
             return false, ('Player %s is not unverified'):format(player_name)
         end
         local executor_id = data.get_player_id(caller)
@@ -177,19 +164,18 @@ register_chatcommand('verify', {
 })
 
 register_chatcommand('unverify', {
-    params='<name> [<reason>]',
-    description='unverify a player',
+    params='<name> [reason]',
+    description='unverify a player, revoking privs and putting them back in jail.',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.player_status.unknown.id,
+        if not table_contains({
                 data.player_status.default.id,
                 data.player_status.suspicious.id,
-            }, player_status.status_id) then
+            }, player_status.id) then
             return false, ('Cannot unverify %s w/ status %s'):format(player_name, player_status.name)
         end
         local executor_id = data.get_player_id(caller)
@@ -220,7 +206,7 @@ register_chatcommand('unverify', {
 })
 
 override_chatcommand('kick', {
-    params='<name> [<reason>]',
+    params='<name> [reason]',
     description='kick a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -249,79 +235,8 @@ override_chatcommand('kick', {
     end
 })
 
-register_chatcommand('lock', {
-    params='<name> [<reason>]',
-    description='lock a player\'s account',
-    privs={[mod_priv]=true},
-    func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_player_status_params(params)
-        if not player_id then
-            return false, reason
-        end
-        if not verbana.util.table_contains({
-                data.player_status.unknown.id,
-                data.player_status.default.id,
-                data.player_status.unverified.id,
-                data.player_status.suspicious.id,
-            }, player_status.status_id) then
-            return false, ('Cannot lock %s w/ status %s'):format(player_name, player_status.name)
-        end
-		local player = minetest.get_player_by_name(player_name)
-        if player then
-            safe_kick_player(caller, player, reason)
-        end
-        local executor_id = data.get_player_id(caller)
-        if not executor_id then
-            return false, 'ERROR: could not get executor ID?'
-        end
-        if not data.set_player_status(player_id, executor_id, data.player_status.locked.id, reason) then
-            return false, 'ERROR logging player status'
-        end
-        if reason then
-            log('action', '%s locked %s because %s', caller, player_name, reason)
-        else
-            log('action', '%s locked %s', caller, player_name)
-        end
-        return true, ('Locked %s'):format(player_name)
-    end
-})
-
-register_chatcommand('unlock', {
-    params='<name> [<reason>]',
-    description='unlock a player\'s account',
-    privs={[mod_priv]=true},
-    func=function(caller, params)
-        local player_id, player_name, player_status, reason = parse_player_status_params(params)
-        if not player_id then
-            return false, reason
-        end
-        if player_status.status_id ~= data.player_status.locked.id then
-            return false, ('Player %s is not locked!'):format(player_name)
-        end
-        local executor_id = data.get_player_id(caller)
-        if not executor_id then
-            return false, 'ERROR: could not get executor ID?'
-        end
-        local status_id
-        if has_suspicious_connection(player_id) then
-            status_id = data.player_status.suspicious.id
-        else
-            status_id = data.player_status.default.id
-        end
-        if not data.set_player_status(player_id, executor_id, status_id, reason) then
-            return false, 'ERROR setting player status'
-        end
-        if reason then
-            log('action', '%s unlocked %s because %s', caller, player_name, reason)
-        else
-            log('action', '%s unlocked %s', caller, player_name)
-        end
-        return true, ('Unlocked %s'):format(player_name)
-    end
-})
-
 override_chatcommand('ban', {
-    params='<name> [<reason>]',
+    params='<name> [timespan] [reason]',
     description='ban a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -329,18 +244,19 @@ override_chatcommand('ban', {
         if not player_id then
             return false, reason
         end
+        local expires
         if reason then
             local first = reason:match('^(%S+)')
-            if verbana.util.parse_time(first) then
-                return false, ('Given reason begins with a timespan %q. Did you mean to use tempban?'):format(first)
+            expires = parse_time(first)
+            if expires then
+                reason = reason:sub(first:len() + 2)
             end
         end
-        if not verbana.util.table_contains({
-                data.player_status.unknown.id,
+        if not table_contains({
                 data.player_status.default.id,
                 data.player_status.unverified.id,
                 data.player_status.suspicious.id,
-            }, player_status.status_id) then
+            }, player_status.id) then
             return false, ('Cannot ban %s w/ status %s'):format(player_name, player_status.name)
         end
 		local player = minetest.get_player_by_name(player_name)
@@ -351,7 +267,7 @@ override_chatcommand('ban', {
         if not executor_id then
             return false, 'ERROR: could not get executor ID?'
         end
-        if not data.set_player_status(player_id, executor_id, data.player_status.banned.id, reason) then
+        if not data.set_player_status(player_id, executor_id, data.player_status.banned.id, reason, expires) then
             return false, 'ERROR logging player status'
         end
         if reason then
@@ -363,46 +279,8 @@ override_chatcommand('ban', {
     end
 })
 
-register_chatcommand('tempban', {
-    params='<name> <timespan> [<reason>]',
-    description='ban a player for a length of time',
-    privs={[mod_priv]=true},
-    func=function(caller, params)
-        local player_id, player_name, player_status, expires, reason = parse_timed_player_status_params(params)
-        if not player_id then
-            return false, reason
-        end
-        if not verbana.util.table_contains({
-                data.player_status.unknown.id,
-                data.player_status.default.id,
-                data.player_status.unverified.id,
-                data.player_status.suspicious.id,
-            }, player_status.status_id) then
-            return false, ('Cannot ban %s w/ status %s'):format(player_name, player_status.name)
-        end
-		local player = minetest.get_player_by_name(player_name)
-        if player then
-            safe_kick_player(caller, player, reason)
-        end
-        local executor_id = data.get_player_id(caller)
-        if not executor_id then
-            return false, 'ERROR: could not get executor ID?'
-        end
-        if not data.set_player_status(player_id, executor_id, data.player_status.tempbanned.id, reason, expires) then
-            return false, 'ERROR logging player status'
-        end
-        local expires_str = os.date("%c", expires)
-        if reason then
-            log('action', '%s tempbanned %s until %s because %s', caller, player_name, expires_str, reason)
-        else
-            log('action', '%s tempbanned %s until %s', caller, player_name, expires_str)
-        end
-        return true, ('Temporarily banned %s until %s'):format(player_name, expires_str)
-    end
-})
-
 override_chatcommand('unban', {
-    params='<name> [<reason>]',
+    params='<name> [reason]',
     description='unban a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -410,10 +288,7 @@ override_chatcommand('unban', {
         if not player_id then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.player_status.banned.id,
-                data.player_status.tempbanned.id,
-            }, player_status.status_id) then
+        if player_status.id ~= data.player_status.banned.id then
             return false, ('Player %s is not banned!'):format(player_name)
         end
         local executor_id = data.get_player_id(caller)
@@ -439,7 +314,7 @@ override_chatcommand('unban', {
 })
 
 register_chatcommand('whitelist', {
-    params='<name> [<reason>]',
+    params='<name> [reason]',
     description='whitelist a player',
     privs={[admin_priv]=true},
     func=function(caller, params)
@@ -447,12 +322,11 @@ register_chatcommand('whitelist', {
         if not player_id then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.player_status.unknown.id,
+        if not table_contains({
                 data.player_status.default.id,
                 data.player_status.unverified.id,
                 data.player_status.suspicious.id,
-            }, player_status.status_id) then
+            }, player_status.id) then
             return false, ('Cannot whitelist %s w/ status %s'):format(player_name, player_status.name)
         end
         local executor_id = data.get_player_id(caller)
@@ -472,7 +346,7 @@ register_chatcommand('whitelist', {
 })
 
 register_chatcommand('unwhitelist', {
-    params='<name> [<reason>]',
+    params='<name> [reason]',
     description='whitelist a player',
     privs={[admin_priv]=true},
     func=function(caller, params)
@@ -480,8 +354,8 @@ register_chatcommand('unwhitelist', {
         if not player_id then
             return false, reason
         end
-        if player_status.status_id ~= data.player_status.whitelisted.id then
-            return false, ('Player %s is not locked!'):format(player_name)
+        if player_status.id ~= data.player_status.whitelisted.id then
+            return false, ('Player %s is not whitelisted!'):format(player_name)
         end
         local executor_id = data.get_player_id(caller)
         if not executor_id then
@@ -500,7 +374,7 @@ register_chatcommand('unwhitelist', {
 })
 
 register_chatcommand('suspect', {
-    params='<name> [<reason>]',
+    params='<name> [reason]',
     description='mark a player as suspicious',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -508,10 +382,7 @@ register_chatcommand('suspect', {
         if not player_id then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.player_status.unknown.id,
-                data.player_status.default.id,
-            }, player_status.status_id) then
+        if player_status.id ~= data.player_status.default.id then
             return false, ('Cannot whitelist %s w/ status %s'):format(player_name, player_status.name)
         end
         local executor_id = data.get_player_id(caller)
@@ -531,7 +402,7 @@ register_chatcommand('suspect', {
 })
 
 register_chatcommand('unsuspect', {
-    params='<name> [<reason>]',
+    params='<name> [reason]',
     description='unmark a player as suspicious',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -539,7 +410,7 @@ register_chatcommand('unsuspect', {
         if not player_id then
             return false, reason
         end
-        if player_status.status_id ~= data.player_status.suspicious.id then
+        if player_status.id ~= data.player_status.suspicious.id then
             return false, ('Player %s is not suspicious!'):format(player_name)
         end
         local executor_id = data.get_player_id(caller)
@@ -572,38 +443,19 @@ local function parse_ip_status_params(params)
     return ipint, ipstr, ip_status, reason
 end
 
-local function parse_timed_ip_status_params(params)
-    local ipstr, timespan_str, reason = params:match('^(%d+%.%d+%.%d+%.%d+)%s+(%d+%w)%s+(.*)$')
-    if not ipstr then
-        ipstr, timespan_str = params:match('^(%d+%.%d+%.%d+%.%d+)%s+(%d+%w)$')
-    end
-    if not ipstr or not lib_ip.is_valid_ip(ipstr) then
-        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
-    end
-    local timespan = verbana.util.parse_time(timespan_str)
-    if not timespan then
-        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
-    end
-    local ipint = lib_ip.ipstr_to_ipint(ipstr)
-    data.register_ip(ipint)
-    local ip_status = data.get_ip_status(ipint, true)
-    local expires = os.time() + timespan
-    return ipint, ipstr, ip_status, expires, reason
-end
-
 register_chatcommand('trust_ip', {
     params='<ip> [reason]',
-    description='',
+    description='Mark an IP as trusted - connections will bypass suspicious network checks',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
         if not ipint then
             return false, reason
         end
-        if not verbana.util.table_contains({
+        if not table_contains({
                 data.ip_status.default.id,
                 data.ip_status.suspicious.id,
-            }, ip_status.status_id) then
+            }, ip_status.id) then
             return false, ('Cannot trust IP w/ status %s'):format(ip_status.name)
         end
         local executor_id = data.get_player_id(caller)
@@ -624,14 +476,14 @@ register_chatcommand('trust_ip', {
 
 register_chatcommand('untrust_ip', {
     params='<ip> [reason]',
-    description='',
+    description='Remove trusted status from an IP',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
         if not ipint then
             return false, reason
         end
-        if ip_status.status_id ~= data.player_status.trusted.id then
+        if ip_status.id ~= data.player_status.trusted.id then
             return false, ('IP %s is not trusted!'):format(ipstr)
         end
         local executor_id = data.get_player_id(caller)
@@ -652,16 +504,14 @@ register_chatcommand('untrust_ip', {
 
 register_chatcommand('suspect_ip', {
     params='<ip> [reason]',
-    description='',
-    privs={[admin_priv]=true},
+    description='Mark an IP as suspicious.',
+    privs={[mod_priv]=true},
     func=function(caller, params)
         local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
         if not ipint then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.ip_status.default.id,
-            }, ip_status.status_id) then
+        if ip_status.id ~= data.ip_status.default.id then
             return false, ('Cannot suspect IP w/ status %s'):format(ip_status.name)
         end
         local executor_id = data.get_player_id(caller)
@@ -682,14 +532,14 @@ register_chatcommand('suspect_ip', {
 
 register_chatcommand('unsuspect_ip', {
     params='<ip> [reason]',
-    description='',
-    privs={[admin_priv]=true},
+    description='Unmark an IP as suspcious',
+    privs={[mod_priv]=true},
     func=function(caller, params)
         local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
         if not ipint then
             return false, reason
         end
-        if ip_status.status_id ~= data.player_status.suspicious.id then
+        if ip_status.id ~= data.player_status.suspicious.id then
             return false, ('IP %s is not suspicious!'):format(ipstr)
         end
         local executor_id = data.get_player_id(caller)
@@ -710,30 +560,32 @@ register_chatcommand('unsuspect_ip', {
 
 register_chatcommand('block_ip', {
     params='<ip> [reason]',
-    description='',
+    description='Block an IP from connecting.',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
         if not ipint then
             return false, reason
         end
+        local expires
         if reason then
             local first = reason:match('^(%S+)')
-            if verbana.util.parse_time(first) then
-                return false, ('Given reason begins with a timespan %q. Did you mean to use tempblock_ip?'):format(first)
+            expires = parse_time(first)
+            if expires then
+                reason = reason:sub(first:len() + 2)
             end
         end
-        if not verbana.util.table_contains({
+        if not table_contains({
                 data.ip_status.default.id,
                 data.ip_status.suspicious.id,
-            }, ip_status.status_id) then
+            }, ip_status.id) then
             return false, ('Cannot block IP w/ status %s'):format(ip_status.name)
         end
         local executor_id = data.get_player_id(caller)
         if not executor_id then
             return false, 'ERROR: could not get executor ID?'
         end
-        if not data.set_ip_status(ipint, executor_id, data.ip_status.blocked.id, reason) then
+        if not data.set_ip_status(ipint, executor_id, data.ip_status.blocked.id, reason, expires) then
             return false, 'ERROR setting IP status'
         end
         -- TODO: kick all connected players
@@ -746,52 +598,16 @@ register_chatcommand('block_ip', {
     end
 })
 
-register_chatcommand('tempblock_ip', {
-    params='<ip> <timespan> [reason]',
-    description='',
-    privs={[admin_priv]=true},
-    func=function(caller, params)
-        local ipint, ipstr, ip_status, expires, reason = parse_timed_ip_status_params(params)
-        if not ipint then
-            return false, reason
-        end
-        if not verbana.util.table_contains({
-                data.ip_status.default.id,
-                data.ip_status.suspicious.id,
-            }, ip_status.status_id) then
-            return false, ('Cannot block IP w/ status %s'):format(ip_status.name)
-        end
-        local executor_id = data.get_player_id(caller)
-        if not executor_id then
-            return false, 'ERROR: could not get executor ID?'
-        end
-        if not data.set_ip_status(ipint, executor_id, data.ip_status.tempblocked.id, reason, expires) then
-            return false, 'ERROR setting IP status'
-        end
-        -- TODO: kick all connected players
-        local expires_str = os.date("%c", expires)
-        if reason then
-            log('action', '%s tempblocked %s until %s because %s', caller, ipstr, expires_str, reason)
-        else
-            log('action', '%s tempblocked %s until %s', caller, ipstr, expires_str)
-        end
-        return true, ('Temporarily blocked %s until %s'):format(ipstr, expires_str)
-    end
-})
-
 register_chatcommand('unblock_ip', {
     params='<ip> [reason]',
-    description='',
+    description='Unblock an IP',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local ipint, ipstr, ip_status, reason = parse_ip_status_params(params)
         if not ipint then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.ip_status.blocked.id,
-                data.ip_status.tempblocked.id,
-            }, ip_status.status_id) then
+        if ip_status.id ~= data.ip_status.blocked.id then
             return false, 'IP is not blocked!'
         end
         local executor_id = data.get_player_id(caller)
@@ -828,41 +644,16 @@ local function parse_asn_status_params(params)
     return asn, description, asn_status, reason
 end
 
-local function parse_timed_asn_status_params(params)
-    local asnstr, timespan_str, reason = params:match('^A?(%d+)%s+(%d+%w)%s+(.*)$')
-    if not asnstr then
-        asnstr, timespan_str = params:match('^A?(%d+)%s+(%d+%w)$')
-    end
-    if not asnstr then
-        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
-    end
-    local asn = tonumber(asnstr)
-    local description = lib_asn.get_description(asn)
-    if description == lib_asn.invalid_asn_description then
-        return nil, nil, nil, ('Not a valid ASN: %q'):format(params)
-    end
-    local timespan = verbana.util.parse_time(timespan_str)
-    if not timespan then
-        return nil, nil, nil, nil, ('Invalid argument(s): %q'):format(params)
-    end
-    data.register_asn(asn)
-    local asn_status = data.get_asn_status(asn, true)
-    local expires = os.time() + timespan
-    return asn, description, asn_status, expires, reason
-end
-
 register_chatcommand('suspect_asn', {
     params='<asn> [reason]',
-    description='',
-    privs={[admin_priv]=true},
+    description='Mark an ASN as suspicious.',
+    privs={[mod_priv]=true},
     func=function(caller, params)
         local asn, description, asn_status, reason = parse_asn_status_params(params)
         if not asn then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.asn_status.default.id,
-            }, asn_status.status_id) then
+        if asn_status.id ~= data.asn_status.default.id then
             return false, ('Cannot suspect ASN w/ status %s'):format(asn_status.name)
         end
         local executor_id = data.get_player_id(caller)
@@ -883,14 +674,14 @@ register_chatcommand('suspect_asn', {
 
 register_chatcommand('unsuspect_asn', {
     params='<asn> [reason]',
-    description='',
-    privs={[admin_priv]=true},
+    description='Unmark an ASN as suspcious.',
+    privs={[mod_priv]=true},
     func=function(caller, params)
         local asn, description, asn_status, reason = parse_asn_status_params(params)
         if not asn then
             return false, reason
         end
-        if asn_status.status_id ~= data.asn_status.suspicious.id then
+        if asn_status.id ~= data.asn_status.suspicious.id then
             return false, ('A%s is not suspicious!'):format(asn)
         end
         local executor_id = data.get_player_id(caller)
@@ -910,31 +701,33 @@ register_chatcommand('unsuspect_asn', {
 })
 
 register_chatcommand('block_asn', {
-    params='<asn> [reason]',
-    description='',
+    params='<asn> [duration] [reason]',
+    description='Block an ASN. Duration and reason optional.',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local asn, description, asn_status, reason = parse_asn_status_params(params)
         if not asn then
             return false, reason
         end
+        local expires
         if reason then
             local first = reason:match('^(%S+)')
-            if verbana.util.parse_time(first) then
-                return false, ('Given reason begins with a timespan %q. Did you mean to use tempblock_asn?'):format(first)
+            expires = parse_time(first)
+            if expires then
+                reason = reason:sub(first:len() + 2)
             end
         end
-        if not verbana.util.table_contains({
+        if not table_contains({
                 data.asn_status.default.id,
                 data.asn_status.suspicious.id,
-            }, asn_status.status_id) then
+            }, asn_status.id) then
             return false, ('Cannot block ASN w/ status %s'):format(asn_status.name)
         end
         local executor_id = data.get_player_id(caller)
         if not executor_id then
             return false, 'ERROR: could not get executor ID?'
         end
-        if not data.set_asn_status(asn, executor_id, data.asn_status.blocked.id, reason) then
+        if not data.set_asn_status(asn, executor_id, data.asn_status.blocked.id, reason, expires) then
             return false, 'ERROR setting ASN status'
         end
         -- TODO: kick all connected players
@@ -947,52 +740,16 @@ register_chatcommand('block_asn', {
     end
 })
 
-register_chatcommand('tempblock_asn', {
-    params='<asn> [reason]',
-    description='',
-    privs={[admin_priv]=true},
-    func=function(caller, params)
-        local asn, description, asn_status, expires, reason = parse_timed_asn_status_params(params)
-        if not asn then
-            return false, reason
-        end
-        if not verbana.util.table_contains({
-                data.asn_status.default.id,
-                data.asn_status.suspicious.id,
-            }, asn_status.status_id) then
-            return false, ('Cannot block ASN w/ status %s'):format(asn_status.name)
-        end
-        local executor_id = data.get_player_id(caller)
-        if not executor_id then
-            return false, 'ERROR: could not get executor ID?'
-        end
-        if not data.set_asn_status(asn, executor_id, data.asn_status.tempblocked.id, reason, expires) then
-            return false, 'ERROR setting IP status'
-        end
-        -- TODO: kick all connected players
-        local expires_str = os.date("%c", expires)
-        if reason then
-            log('action', '%s tempblocked A%s until %s because %s', caller, asn, expires_str, reason)
-        else
-            log('action', '%s tempblocked A%s until %s', caller, asn, expires_str)
-        end
-        return true, ('Temporarily blocked A%s until %s'):format(asn, expires_str)
-    end
-})
-
 register_chatcommand('unblock_asn', {
     params='<asn> [reason]',
-    description='',
+    description='Unblock an ASN.',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local asn, description, asn_status, reason = parse_asn_status_params(params)
         if not asn then
             return false, reason
         end
-        if not verbana.util.table_contains({
-                data.asn_status.blocked.id,
-                data.asn_status.tempblocked.id,
-            }, asn_status.status_id) then
+        if asn_status.id ~= data.asn_status.blocked.id then
             return false, 'ASN is not blocked!'
         end
         local executor_id = data.get_player_id(caller)
@@ -1011,8 +768,8 @@ register_chatcommand('unblock_asn', {
     end
 })
 ---------------- GET LOGS ---------------
-register_chatcommand('player_status_log', {
-    params='<name> [<number>]',
+register_chatcommand('ban_record', {
+    params='<name> [number]',
     description='shows the status log of a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -1059,7 +816,7 @@ register_chatcommand('player_status_log', {
 })
 
 register_chatcommand('ip_status_log', {
-    params='<IP> [<number>]',
+    params='<IP> [number]',
     description='shows the status log of an IP',
     privs={[admin_priv]=true},
     func=function(caller, params)
@@ -1103,7 +860,7 @@ register_chatcommand('ip_status_log', {
 })
 
 register_chatcommand('asn_status_log', {
-    params='<ASN> [<number>]',
+    params='<ASN> [number]',
     description='shows the status log of an ASN',
     privs={[admin_priv]=true},
     func=function(caller, params)
@@ -1146,8 +903,8 @@ register_chatcommand('asn_status_log', {
     end
 })
 
-register_chatcommand('login_record', {
-    params='<name> [<number>]',
+register_chatcommand('logins', {
+    params='<name> [number]',
     description='shows the login record of a player',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -1188,7 +945,7 @@ register_chatcommand('login_record', {
     end
 })
 
-register_chatcommand('inspect_player', {
+register_chatcommand('inspect', {
     params='<name>',
     description='list ips, asns and statuses associated with a player',
     privs={[mod_priv]=true},
@@ -1228,7 +985,7 @@ register_chatcommand('inspect_player', {
 register_chatcommand('inspect_ip', {
     params='<IP>',
     description='list player accounts and statuses associated with an IP',
-    privs={[mod_priv]=true},
+    privs={[admin_priv]=true},
     func=function(caller, params)
         local ipstr = params:match('^(%d+%.%d+%.%d+%.%d+)$')
         if not ipstr or not lib_ip.is_valid_ip(ipstr) then
@@ -1254,38 +1011,38 @@ register_chatcommand('inspect_ip', {
     end
 })
 
-register_chatcommand('inspect_asn', {
-    params='<asn>',
-    description='list player accounts and statuses associated with an ASN',
-    privs={[mod_priv]=true},
-    func=function(caller, params)
-        -- TODO: this generates a ton of output. need a way to page through it...
-        local asn = params:match('^A?(%d+)$')
-        if not asn then
-            return false, 'Invalid argument'
-        end
-        asn = tonumber(asn)
-        local description = lib_asn.get_description(asn)
-        local rows = data.get_asn_associations(asn)
-        if not rows then
-            return false, 'An error occurred (see server logs)'
-        end
-        if #rows == 0 then
-            return true, 'No records found.'
-        end
-        minetest.chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
-        for _, row in ipairs(rows) do
-            local message = ('% 20s: %s'):format(
-                row.player_name,
-                row.player_status_name or data.player_status.default.name
-            )
-            minetest.chat_send_player(caller, message)
-        end
-        return true
-    end
-})
+--register_chatcommand('inspect_asn', {
+--    params='<asn>',
+--    description='list player accounts and statuses associated with an ASN',
+--    privs={[admin_priv]=true},
+--    func=function(caller, params)
+--        -- TODO: this generates a ton of output. need a way to page through it, or ignore most of it
+--        local asn = params:match('^A?(%d+)$')
+--        if not asn then
+--            return false, 'Invalid argument'
+--        end
+--        asn = tonumber(asn)
+--        local description = lib_asn.get_description(asn)
+--        local rows = data.get_asn_associations(asn)
+--        if not rows then
+--            return false, 'An error occurred (see server logs)'
+--        end
+--        if #rows == 0 then
+--            return true, 'No records found.'
+--        end
+--        minetest.chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
+--        for _, row in ipairs(rows) do
+--            local message = ('% 20s: %s'):format(
+--                row.player_name,
+--                row.player_status_name or data.player_status.default.name
+--            )
+--            minetest.chat_send_player(caller, message)
+--        end
+--        return true
+--    end
+--})
 
-register_chatcommand('player_cluster', {
+register_chatcommand('cluster', {
     params='<player_name>',
     description='Get a list of other players who have ever shared an IP w/ the given player',
     privs={[mod_priv]=true},
@@ -1347,8 +1104,35 @@ register_chatcommand('who2', {
     end
 })
 
--- TODO: alias (for listing an account's primary, cascade status)
--- TODO: list recent bans/kicks/locks/etc
--- TODO: first_login (=b) for all players
--- TODO: asn statistics
--- TODO: add a "report" command so that players can log issues w/ other players for the mods to peruse
+register_chatcommand('banlog', {
+    params='[number]',
+    description='Get a list of recent player status changes',
+    privs={[mod_priv]=true},
+    func=function(caller, params)
+        local limit
+        if params and params ~= '' then
+            limit = params:match('^%s*(%d+)%s*$')
+            if limit then
+                limit = tonumber(limit)
+            else
+                return false, 'Invalid argument'
+            end
+        else
+            limit = 20
+        end
+        local rows = data.get_ban_log(limit)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        for _, row in ipairs(rows) do
+            local message = ('% 20s: %s'):format(
+                row.player_name,
+                row.player_status_name or data.player_status.default.name
+            )
+            minetest.chat_send_player(caller, message)
+        end
+    end
+})
