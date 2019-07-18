@@ -8,6 +8,17 @@ local time_units = {
     y = 60 * 60 * 24 * 365,
 }
 
+function verbana.util.parse_time(text)
+    if type(text) ~= 'string' then
+        return nil
+    end
+    local n, unit = text:lower():match('^(%d+)([hdwmy])')
+    if not (n and unit) then
+        return nil
+    end
+    return n * time_units[unit]
+end
+
 function verbana.util.load_file(filename)
     local file = io.open(filename, 'r')
     if not file then
@@ -39,17 +50,6 @@ function verbana.util.table_contains(t, value)
         if v == value then return true end
     end
     return false
-end
-
-function verbana.util.parse_time(text)
-    if type(text) ~= 'string' then
-        return nil
-    end
-    local n, unit = text:lower():match('^(%d+)([hdwmy])')
-    if not (n and unit) then
-        return nil
-    end
-    return n * time_units[unit]
 end
 
 --function verbana.util.string_split(str, delim)

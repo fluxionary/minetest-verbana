@@ -152,6 +152,16 @@ end
 
 init_db()
 ---- data API -----
+function verbana.data.reset_db()
+    local code = [[
+        PRAGMA writable_schema = 1;
+        DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger');
+        PRAGMA writable_schema = 0;
+        VACUUM;
+        PRAGMA INTEGRITY_CHECK;
+    ]]
+end
+
 function verbana.data.import_from_sban(filename)
     -- apologies for the very long method
     local start = os.clock()
@@ -626,7 +636,7 @@ function verbana.data.get_player_associations(player_id)
     ]]
     return get_full_ntable(code, 'player associations', player_id)
 end
-function verbana.data.get_ip_associations(ipint)
+function verbana.data.get_ip_associations(ipint, from_time)
     local code = [[
         SELECT
       DISTINCT player.name                 player_name
@@ -634,12 +644,13 @@ function verbana.data.get_ip_associations(ipint)
           FROM assoc
           JOIN player            ON player.id == assoc.player_id
      LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
+          JOIN connection_log    ON connection_log.timestamp >= ? AND connection_log.ip == assoc.ip AND connection_log.asn == assoc.asn
          WHERE assoc.ip == ?
       ORDER BY LOWER(player.name)
     ]]
-    return get_full_ntable(code, 'ip associations', ipint)
+    return get_full_ntable(code, 'ip associations', from_time, ipint)
 end
-function verbana.data.get_asn_associations(asn)
+function verbana.data.get_asn_associations(asn, from_time)
     local code = [[
         SELECT
       DISTINCT player.name        player_name
@@ -648,10 +659,11 @@ function verbana.data.get_asn_associations(asn)
           JOIN player            ON player.id == assoc.player_id
      LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
      LEFT JOIN player_status     ON player_status.id == player_status_log.status_id
+          JOIN connection_log    ON connection_log.timestamp >= ? AND connection_log.ip == assoc.ip AND connection_log.asn == assoc.asn
          WHERE assoc.asn == ?
       ORDER BY LOWER(player.name)
     ]]
-    return get_full_ntable(code, 'asn associations', asn)
+    return get_full_ntable(code, 'asn associations', from_time, asn)
 end
 
 function verbana.data.get_player_cluster(player_id)

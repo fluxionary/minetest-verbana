@@ -1,6 +1,7 @@
 verbana.lib_ip = {}
 
 function verbana.lib_ip.is_valid_ip(ipstr)
+    if type(ipstr) ~= 'string' then return false end
     local a, b, c, d = ipstr:match('^(%d+)%.(%d+)%.(%d+)%.(%d+)$')
     a = tonumber(a)
     b = tonumber(b)

@@ -34,6 +34,12 @@ end
 
 local function alias_chatcommand(name, existing_name)
     if debug_mode then name = ('v_%s'):format(name) end
+    local existing_def = minetest.registered_chatcommands[existing_name]
+    if not existing_def then
+        verbana.log('error', 'Could not alias command %q to %q, because %q doesn\'t exist', name, existing_name, existing_name)
+    else
+        minetest.register_chatcommand(name, existing_def)
+    end
 
 end
 
@@ -858,6 +864,7 @@ register_chatcommand('ip_status_log', {
         return true
     end
 })
+alias_chatcommand('isl', 'ip_status_log')
 
 register_chatcommand('asn_status_log', {
     params='<ASN> [number]',
@@ -867,9 +874,9 @@ register_chatcommand('asn_status_log', {
         local asnstr, numberstr = string.match(params, '^A?(%d+)%s+(%d+)$')
         if not asnstr then
             asnstr = string.match(params, '^A?(%d+)$')
-        end
-        if not asnstr then
-            return false, 'invalid arguments'
+            if not asnstr then
+                return false, 'invalid arguments'
+            end
         end
         local asn = tonumber(asnstr)
         local rows = data.get_asn_status_log(asn)
@@ -902,6 +909,7 @@ register_chatcommand('asn_status_log', {
         return true
     end
 })
+alias_chatcommand('asl', 'asn_status_log')
 
 register_chatcommand('logins', {
     params='<name> [number]',
@@ -983,16 +991,29 @@ register_chatcommand('inspect', {
 })
 
 register_chatcommand('inspect_ip', {
-    params='<IP>',
+    params='<IP> [timespan]',
     description='list player accounts and statuses associated with an IP',
     privs={[admin_priv]=true},
     func=function(caller, params)
-        local ipstr = params:match('^(%d+%.%d+%.%d+%.%d+)$')
-        if not ipstr or not lib_ip.is_valid_ip(ipstr) then
-            return false, 'Invalid argument'
+        local ipstr, timespan_str = params:match('^(%d+%.%d+%.%d+%.%d+)%s+(%w+)$')
+        if not lib_ip.is_valid_ip(ipstr) then
+            ipstr = params:match('^%s*(%d+%.%d+%.%d+%.%d+)%s*$')
+            if not lib_ip.is_valid_ip(ipstr) then
+                return false, 'Invalid arguments'
+            end
+        end
+        local timespan
+        if timespan_str then
+            timespan = parse_time(timespan_str)
+            if not timespan then
+                return false, 'Invalid timespan'
+            end
+        else
+            timespan = 60*60*24*7
         end
         local ipint = lib_ip.ipstr_to_ipint(ipstr)
-        local rows = data.get_ip_associations(ipint)
+        local start_time = os.time() - timespan
+        local rows = data.get_ip_associations(ipint, timespan)
         if not rows then
             return false, 'An error occurred (see server logs)'
         end
@@ -1010,37 +1031,51 @@ register_chatcommand('inspect_ip', {
         return true
     end
 })
+alias_chatcommand('iip', 'inspect_ip')
 
---register_chatcommand('inspect_asn', {
---    params='<asn>',
---    description='list player accounts and statuses associated with an ASN',
---    privs={[admin_priv]=true},
---    func=function(caller, params)
---        -- TODO: this generates a ton of output. need a way to page through it, or ignore most of it
---        local asn = params:match('^A?(%d+)$')
---        if not asn then
---            return false, 'Invalid argument'
---        end
---        asn = tonumber(asn)
---        local description = lib_asn.get_description(asn)
---        local rows = data.get_asn_associations(asn)
---        if not rows then
---            return false, 'An error occurred (see server logs)'
---        end
---        if #rows == 0 then
---            return true, 'No records found.'
---        end
---        minetest.chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
---        for _, row in ipairs(rows) do
---            local message = ('% 20s: %s'):format(
---                row.player_name,
---                row.player_status_name or data.player_status.default.name
---            )
---            minetest.chat_send_player(caller, message)
---        end
---        return true
---    end
---})
+register_chatcommand('inspect_asn', {
+    params='<asn> <timespan>',
+    description='list player accounts and statuses associated with an ASN',
+    privs={[admin_priv]=true},
+    func=function(caller, params)
+        local asn, timespan_str = params:match('^A?(%d+)%s+(%w+)$')
+        if not asn then
+            asn = params:match('^A?(%d+)$')
+            if not asn then
+                return false, 'Invalid argument'
+            end
+        end
+        local timespan
+        if timespan_str then
+            timespan = parse_time(timespan_str)
+            if not timespan then
+                return false, 'Invalid timespan'
+            end
+        else
+            timespan = 60*60*24*7
+        end
+        asn = tonumber(asn)
+        local description = lib_asn.get_description(asn)
+        local start_time = os.time() - timespan
+        local rows = data.get_asn_associations(asn, start_time)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        if #rows == 0 then
+            return true, 'No records found.'
+        end
+        minetest.chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
+        for _, row in ipairs(rows) do
+            local message = ('% 20s: %s'):format(
+                row.player_name,
+                row.player_status_name or data.player_status.default.name
+            )
+            minetest.chat_send_player(caller, message)
+        end
+        return true
+    end
+})
+alias_chatcommand('ias', 'inspect_asn')
 
 register_chatcommand('cluster', {
     params='<player_name>',
