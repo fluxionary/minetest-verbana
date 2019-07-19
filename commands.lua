@@ -279,12 +279,14 @@ override_chatcommand('ban', {
         if not player_id then
             return false, reason
         end
+        local timespan
         local expires
         if reason then
             local first = reason:match('^(%S+)')
-            expires = parse_time(first)
-            if expires then
+            timespan = parse_time(first)
+            if timespan then
                 reason = reason:sub(first:len() + 2)
+                expires = os.time() + timespan
             end
         end
         if not table_contains({
@@ -305,10 +307,18 @@ override_chatcommand('ban', {
         if not data.set_player_status(player_id, executor_id, data.player_status.banned.id, reason, expires) then
             return false, 'ERROR logging player status'
         end
-        if reason then
-            log('action', '%s banned %s because %s', caller, player_name, reason)
+        if expires then
+            if reason then
+                log('action', '%s banned %s until %s because %s', caller, player_name, os.date("%c", expires), reason)
+            else
+                log('action', '%s banned %s until %s', caller, player_name, os.date("%c", expires))
+            end
         else
-            log('action', '%s banned %s', caller, player_name)
+            if reason then
+                log('action', '%s banned %s because %s', caller, player_name, reason)
+            else
+                log('action', '%s banned %s', caller, player_name)
+            end
         end
         return true, ('Banned %s'):format(player_name)
     end
@@ -602,12 +612,14 @@ register_chatcommand('block_ip', {
         if not ipint then
             return false, reason
         end
+        local timespan
         local expires
         if reason then
             local first = reason:match('^(%S+)')
-            expires = parse_time(first)
-            if expires then
+            timespan = parse_time(first)
+            if timespan then
                 reason = reason:sub(first:len() + 2)
+                expires = os.time() + timespan
             end
         end
         if not table_contains({
@@ -624,10 +636,18 @@ register_chatcommand('block_ip', {
             return false, 'ERROR setting IP status'
         end
         util.safe_kick_ip(ipstr)
-        if reason then
-            log('action', '%s blocked %s because %s', caller, ipstr, reason)
+        if expires then
+            if reason then
+                log('action', '%s blocked %s until %s because %s', caller, ipstr, os.date("%c", expires), reason)
+            else
+                log('action', '%s blocked %s until %s', caller, ipstr, os.date("%c", expires))
+            end
         else
-            log('action', '%s blocked %s', caller, ipstr)
+            if reason then
+                log('action', '%s blocked %s because %s', caller, ipstr, reason)
+            else
+                log('action', '%s blocked %s', caller, ipstr)
+            end
         end
         return true, ('Blocked %s'):format(ipstr)
     end
@@ -744,12 +764,14 @@ register_chatcommand('block_asn', {
         if not asn then
             return false, reason
         end
+        local timespan
         local expires
         if reason then
             local first = reason:match('^(%S+)')
-            expires = parse_time(first)
-            if expires then
+            timespan = parse_time(first)
+            if timespan then
                 reason = reason:sub(first:len() + 2)
+                expires = os.time() + timespan
             end
         end
         if not table_contains({
@@ -766,10 +788,18 @@ register_chatcommand('block_asn', {
             return false, 'ERROR setting ASN status'
         end
         util.safe_kick_asn(asn)
-        if reason then
-            log('action', '%s blocked A%s because %s', caller, asn, reason)
+        if expires then
+            if reason then
+                log('action', '%s blocked A%s until %s because %s', caller, asn, os.date("%c", expires), reason)
+            else
+                log('action', '%s blocked A%s until %s ', caller, asn, os.date("%c", expires))
+            end
         else
-            log('action', '%s blocked A%s', caller, asn)
+            if reason then
+                log('action', '%s blocked A%s because %s', caller, asn, reason)
+            else
+                log('action', '%s blocked A%s', caller, asn)
+            end
         end
         return true, ('Blocked A%s'):format(asn)
     end

@@ -797,15 +797,21 @@ end
 
 function verbana.data.get_asn_stats(asn)
     local code = [[
-        SELECT COALESCE(player_status_log.status_id, ?) player_status_id
-             , COUNT(player_status.name)                count
+        SELECT COALESCE(player_status_log.status_id, ?)        player_status_id
+             , COUNT(COALESCE(player_status_log.status_id, ?)) count
           FROM (SELECT DISTINCT player_id id FROM assoc WHERE asn = ?) asn_player
           JOIN player            ON player.id            == asn_player.id
      LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
-      GROUP BY player_status_id
-      ORDER BY player_status_id
+      GROUP BY COALESCE(player_status_log.status_id, ?)
+      ORDER BY COALESCE(player_status_log.status_id, ?)
     ]]
-    return get_full_ntable(code, 'asn stats', verbana.data.player_status.default.id, asn)
+    return get_full_ntable(code, 'asn stats',
+        verbana.data.player_status.default.id,
+        verbana.data.player_status.default.id,
+        asn,
+        verbana.data.player_status.default.id,
+        verbana.data.player_status.default.id
+    )
 end
 
 function verbana.data.get_master(player_id)
