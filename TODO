@@ -1,10 +1,1 @@
-IPs and ASNs have to be inserted into the relevant tables (ip and asn) before we can log them...
-also, probably set the current_status_id when we update their statuses?
-
-command to toggle global verification
-
-command & logic for alias (for listing an account's primary, cascade status)
-command: list recent bans/kicks/locks/etc
-command: first_login (=b) for all players
-command: asn statistics
-command: add a "report" command so that players can log issues w/ other players for the mods to peruse
+test! debug!

@@ -12,7 +12,7 @@ function verbana.util.parse_time(text)
     if type(text) ~= 'string' then
         return nil
     end
-    local n, unit = text:lower():match('^(%d+)([hdwmy])')
+    local n, unit = text:lower():match('^%s*(%d+)([hdwmy])%s*')
     if not (n and unit) then
         return nil
     end
@@ -52,14 +52,10 @@ function verbana.util.table_contains(t, value)
     return false
 end
 
---function verbana.util.string_split(str, delim)
---    if not str:find(delim) then return {str} end
---    local bits = {}
---    while str ~= '' do
---
---    end
---    local TODO = 1 / nil
---end
+function verbana.util.table_is_empty(t)
+    for _ in pairs(t) do return false end
+    return true
+end
 
 function verbana.util.safe(func, rv_on_fail)
     -- wrap a function w/ logic to avoid crashing the game
@@ -89,8 +85,23 @@ function verbana.util.safe_kick_player(caller, player, reason)
     end
 end
 
-function verbana.util.table_is_empty(t)
-    for _ in pairs(t) do return false end
-    return true
+function verbana.util.safe_kick_ip(caller, ipstr, reason)
+    for _, player in ipairs(minetest.get_connected_players()) do
+        local name = player:get_player_name()
+        if minetest.get_player_ip(name) == ipstr then
+            verbana.util.safe_kick_player(caller, player, reason)
+        end
+    end
+end
+
+function verbana.util.safe_kick_asn(caller, asn, reason)
+    for _, player in ipairs(minetest.get_connected_players()) do
+        local name = player:get_player_name()
+        local ipstr = minetest.get_player_ip(name)
+        local ipint = verbana.lib_ip.ipstr_to_ipint(ipstr)
+        if verbana.lib_asn.lookup(ipint) == asn then
+            verbana.util.safe_kick_player(caller, player, reason)
+        end
+    end
 end
 

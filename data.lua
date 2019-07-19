@@ -16,17 +16,23 @@ verbana.data.player_status = {
     unverified={name='unverified', id=5},
     kicked={name='kicked', id=6},  -- for logging kicks
 }
+verbana.data.player_status_name = {}
+for _, value in pairs(verbana.data.player_status) do verbana.data.player_status_name[value.id] = value.name end
 verbana.data.ip_status = {
     default={name='default', id=1},
     suspicious={name='suspicious', id=2},
     blocked={name='blocked', id=3},
     trusted={name='trusted', id=4},
 }
+verbana.data.ip_status_name = {}
+for _, value in pairs(verbana.data.ip_status) do verbana.data.ip_status_name[value.id] = value.name end
 verbana.data.asn_status = {
     default={name='default', id=1},
     suspicious={name='suspicious', id=2},
     blocked={name='blocked', id=3},
 }
+verbana.data.asn_status_name = {}
+for _, value in pairs(verbana.data.asn_status) do verbana.data.asn_status_name[value.id] = value.name end
 verbana.data.verbana_player = '!verbana!'
 verbana.data.verbana_player_id = 1
 -- wrap sqllite API to make error reporting less messy
@@ -160,6 +166,10 @@ function verbana.data.reset_db()
         VACUUM;
         PRAGMA INTEGRITY_CHECK;
     ]]
+    if not execute(code, 'erase current DB') then
+        return false
+    end
+    init_db()
 end
 
 function verbana.data.import_from_sban(filename)
@@ -235,6 +245,13 @@ function verbana.data.import_from_sban(filename)
     ]]
     local insert_player_status_statement = prepare(insert_player_status_sql, 'insert player status')
     if not insert_player_status_statement then return _error() end
+--    local update_player_current_status_sql = [[
+--        UPDATE player
+--           SET current_status_id = ?
+--         WHERE id = ?
+--    ]]
+--    local update_player_current_status_statement = prepare(update_player_current_status_sql, 'update player current status')
+--    if not update_player_current_status_statement then return _error() end
     local select_bans_sql = [[
         SELECT name, source, created, reason, expires, u_source, u_reason, u_date
           FROM bans
@@ -250,20 +267,23 @@ function verbana.data.import_from_sban(filename)
             unban_source_id = player_id_by_name[u_source]
         end
         local status_id = banned_player_status_id
+        if expires == '' then expires = nil end
         -- BAN
-        if not bind_and_step(insert_player_status_statement, 'insert player status (ban)', source_id, player_id, status_id, created, reason, expires) then return _error() end
+        if not bind_and_step(insert_player_status_statement,     'insert player status (ban)',   source_id,       player_id, status_id,                created, reason,   expires) then return _error() end
         -- UNBAN
         if unban_source_id then
-            if not bind_and_step(insert_player_status_statement, 'insert player status (unban)', unban_source_id, player_id, default_player_status_id, u_date, u_reason, nil) then return _error() end
+            if not bind_and_step(insert_player_status_statement, 'insert player status (unban)', unban_source_id, player_id, default_player_status_id, u_date,  u_reason, nil) then return _error() end
         end
+--        bind_and_step(update_player_current_status_statement, 'update player current status', ?, player_id)
     end
     if not finalize(insert_player_status_statement, 'insert player status') then return _error() end
+--    if not finalize(update_player_current_status_statement, 'update player current status') then return _error() end
     -- SET LAST ACTION --
     local set_current_status_id_sql = [[
         UPDATE player
            SET current_status_id = (SELECT MAX(player_status_log.id)
-                                   FROM player_status_log
-                                  WHERE player_status_log.player_id == player.id);
+                                      FROM player_status_log
+                                     WHERE player_status_log.player_id == player.id);
     ]]
     if not execute(set_current_status_id_sql, 'set last status') then return _error() end
     -- CLEANUP --
@@ -303,6 +323,7 @@ end
 
 local player_status_cache = {}
 function verbana.data.get_player_status(player_id, create_if_new)
+    player_id = verbana.data.get_master(player_id) or player_id
     local cached_status = player_status_cache[player_id]
     if cached_status then return cached_status, false end
     local code = [[
@@ -314,9 +335,9 @@ function verbana.data.get_player_status(player_id, create_if_new)
              , log.reason    reason
              , log.expires   expires
           FROM player
-          JOIN player_status_log log ON player.current_status_id == log.id
-          JOIN player_status status  ON log.status_id == status.id
-          JOIN player executor       ON log.executor_id == executor.id
+          JOIN player_status_log log      ON player.current_status_id == log.id
+          JOIN player_status     status   ON log.status_id == status.id
+          JOIN player            executor ON log.executor_id == executor.id
          WHERE player.id == ?
          LIMIT 1
     ]]
@@ -337,6 +358,7 @@ function verbana.data.get_player_status(player_id, create_if_new)
     return verbana.data.get_player_status(player_id, false), true
 end
 function verbana.data.set_player_status(player_id, executor_id, status_id, reason, expires, no_update_current)
+    player_id = verbana.data.get_master(player_id) or player_id
     player_status_cache[player_id] = nil
     local code = [[
         INSERT INTO player_status_log (player_id, executor_id, status_id, reason, expires, timestamp)
@@ -467,6 +489,7 @@ function verbana.data.log(player_id, ipint, asn, success)
 end
 
 function verbana.data.assoc(player_id, ipint, asn)
+    player_id = verbana.data.get_master(player_id) or player_id
     local insert_code = [[
         INSERT OR IGNORE INTO assoc (player_id, ip, asn, first_seen, last_seen)
                              VALUES (?,         ?,  ?,   ?,          ?)
@@ -483,17 +506,20 @@ function verbana.data.assoc(player_id, ipint, asn)
     return true
 end
 function verbana.data.has_asn_assoc(player_id, asn)
+    player_id = verbana.data.get_master(player_id) or player_id
     local code = 'SELECT 1 FROM assoc WHERE player_id = ? AND asn == ? LIMIT 1'
     local table = get_full_table(code, 'find player asn assoc', player_id, asn)
     return #table == 1
 end
 function verbana.data.has_ip_assoc(player_id, ipint)
+    player_id = verbana.data.get_master(player_id) or player_id
     local code = 'SELECT 1 FROM assoc WHERE player_id = ? AND ip == ? LIMIT 1'
     local table = get_full_table(code, 'find player asn assoc', player_id, ipint)
     return #table == 1
 end
 
 function verbana.data.get_player_status_log(player_id)
+    player_id = verbana.data.get_master(player_id) or player_id
     local code = [[
         SELECT executor.name executor
              , status.name   status
@@ -540,24 +566,30 @@ function verbana.data.get_asn_status_log(asn)
     return get_full_ntable(code, 'asn status log', asn)
 end
 
+function verbana.data.get_first_login(player_id)
+    local code = [[
+        SELECT timestamp
+          FROM connection_log
+         WHERE player_id == ?
+      ORDER BY timestamp
+         LIMIT 1
+    ]]
+    return get_full_ntable(code, 'first login', player_id)
+end
 function verbana.data.get_player_connection_log(player_id, limit)
     local code = [[
-        SELECT log.ip          ipint
-             , log.asn         asn
-             , log.success     success
-             , log.timestamp   timestamp
-             , ip_status.id    ip_status_id
-             , ip_status.name  ip_status_name
-             , asn_status.id   asn_status_id
-             , asn_status.name asn_status_name
+        SELECT log.ip                   ipint
+             , log.asn                  asn
+             , log.success              success
+             , log.timestamp            timestamp
+             , ip_status_log.status_id  ip_status_id
+             , asn_status_log.status_id asn_status_id
           FROM connection_log log
-          JOIN player ON player.id == log.player_id
-          JOIN ip ON ip.ip == log.ip
-     LEFT JOIN ip_status_log ON ip.current_status_id == ip_status_log.id
-     LEFT JOIN ip_status ON ip_status_log.status_id == ip_status.id
-          JOIN asn ON asn.asn == log.asn
-     LEFT JOIN asn_status_log ON asn.current_status_id == asn_status_log.id
-     LEFT JOIN asn_status ON asn_status_log.status_id == asn_status.id
+          JOIN player         ON player.id         == log.player_id
+          JOIN ip             ON ip.ip             == log.ip
+     LEFT JOIN ip_status_log  ON ip_status_log.id  == ip.current_status_id
+          JOIN asn            ON asn.asn           == log.asn
+     LEFT JOIN asn_status_log ON asn_status_log.id == asn.current_status_id
          WHERE player.id == ?
       ORDER BY timestamp DESC
          LIMIT ?
@@ -619,18 +651,16 @@ end
 
 function verbana.data.get_player_associations(player_id)
     local code = [[
-        SELECT assoc.ip        ipint
-             , assoc.asn       asn
-             , ip_status.name  ip_status
-             , asn_status.name asn_status
+        SELECT assoc.ip          ipint
+             , assoc.asn         asn
+             , ip_status_log.id  ip_status_id
+             , asn_status_log.id asn_status_id
           FROM assoc
           JOIN player         ON player.id == assoc.player_id
           JOIN ip             ON ip.ip == assoc.ip
      LEFT JOIN ip_status_log  ON ip.current_status_id == ip_status_log.id
-     LEFT JOIN ip_status      ON ip_status_log.status_id == ip_status.id
           JOIN asn            ON asn.asn == assoc.asn
      LEFT JOIN asn_status_log ON asn.current_status_id == asn_status_log.id
-     LEFT JOIN asn_status     ON asn_status_log.status_id == asn_status.id
          WHERE player.id == ?
       ORDER BY assoc.asn, assoc.ip
     ]]
@@ -653,13 +683,14 @@ end
 function verbana.data.get_asn_associations(asn, from_time)
     local code = [[
         SELECT
-      DISTINCT player.name        player_name
-             , player_status.name player_status_name
+      DISTINCT player.name                 player_name
+             , player_status_log.status_id player_status_id
           FROM assoc
-          JOIN player            ON player.id == assoc.player_id
-     LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
-     LEFT JOIN player_status     ON player_status.id == player_status_log.status_id
-          JOIN connection_log    ON connection_log.timestamp >= ? AND connection_log.ip == assoc.ip AND connection_log.asn == assoc.asn
+          JOIN player            ON player.id                == assoc.player_id
+     LEFT JOIN player_status_log ON player_status_log.id     == player.current_status_id
+          JOIN connection_log    ON connection_log.timestamp >= ?
+                                AND connection_log.ip == assoc.ip
+                                AND connection_log.asn == assoc.asn
          WHERE assoc.asn == ?
       ORDER BY LOWER(player.name)
     ]]
@@ -670,14 +701,13 @@ function verbana.data.get_player_cluster(player_id)
     local code = [[
         SELECT
       DISTINCT other.name         player_name
-             , player_status.name player_status_name
+             , player_status_log.status_id player_status_id
           FROM player
-          JOIN assoc player_assoc ON player.id == player_assoc.player_id
-          JOIN assoc other_assoc  ON player_assoc.ip == other_assoc.ip
+          JOIN assoc player_assoc ON player_assoc.player_id == player.id
+          JOIN assoc other_assoc  ON other_assoc.ip == player_assoc.ip
                                  AND player_assoc.player_id != other_assoc.player_id
-          JOIN player other       ON other_assoc.player_id == other.id
-     LEFT JOIN player_status_log  ON other.current_status_id == player_status_log.id
-     LEFT JOIN player_status      ON player_status.id == player_status_log.status_id
+          JOIN player other       ON other.id == other_assoc.player_id
+     LEFT JOIN player_status_log  ON player_status_log.id == other.current_status_id
          WHERE player.id == ?
       ORDER BY LOWER(other.name)
     ]]
@@ -729,9 +759,9 @@ function verbana.data.get_ban_log(limit)
              , player_status_log.timestamp reason
              , player_status_log.expires   expires
           FROM player_status_log
-          JOIN player            ON player.id == player_status_log.player_id
-          JOIN player executor   ON executor.id == player_status_log.executor_id
-          JOIN player_status     ON player_status.id == player_status_log.status_id
+          JOIN player          ON player.id        == player_status_log.player_id
+          JOIN player executor ON executor.id      == player_status_log.executor_id
+          JOIN player_status   ON player_status.id == player_status_log.status_id
          WHERE player_status_log.status_id IN (?, ?)
          ORDER BY player_status_log.timestamp DESC
          LIMIT ?
@@ -744,3 +774,158 @@ function verbana.data.get_ban_log(limit)
     )
 end
 
+function verbana.data.add_report(reporter_id, report)
+    local code = [[
+        INSERT INTO report
+                    (reporter_id, report, timestamp)
+             VALUES (?          , ?     , ?        )
+    ]]
+    return execute_bind_one(code, 'add report', reporter_id, report, os.time())
+end
+
+function verbana.data.get_reports(from_time)
+    local code = [[
+        SELECT player.name      reporter
+             , report.report    report
+             , report.timestamp timestamp
+          FROM report
+          JOIN player ON player.id == report.reporter_id
+         WHERE report.timestamp >= ?
+    ]]
+    return get_full_ntable(code, 'get reports', from_time)
+end
+
+function verbana.data.get_asn_stats(asn)
+    local code = [[
+        SELECT COALESCE(player_status_log.status_id, ?) player_status_id
+             , COUNT(player_status.name)                count
+          FROM (SELECT DISTINCT player_id id FROM assoc WHERE asn = ?) asn_player
+          JOIN player            ON player.id            == asn_player.id
+     LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
+      GROUP BY player_status_id
+      ORDER BY player_status_id
+    ]]
+    return get_full_ntable(code, 'asn stats', verbana.data.player_status.default.id, asn)
+end
+
+function verbana.data.get_master(player_id)
+    local code = [[
+        SELECT master.id   id
+             , master.name name
+          FROM player
+     LEFT JOIN player master ON master.id == player.master_id
+         WHERE player.id = ?
+    ]]
+    local rows = get_full_ntable(code, 'get_master', player_id)
+    if rows and #rows > 0 then
+        return rows[1].id, rows[1].name
+    end
+end
+
+function verbana.data.set_master(player_id, master_id)
+    --[[
+        case 1: master has no master
+                just set player's master
+        case 2: master has a master
+                subcase A: player and master's master are different
+                    set player's master to master's master
+                subcase B: player == master's master
+                    swap player and master
+        if other players have player as their master, update their master to player's new master.
+        loops can not be created this way, because we've ensured that a "true" master can't have
+        a master of its own.
+    ]]
+    local master_master_id = verbana.data.get_master(master_id)
+    if master_master_id == player_id then
+        return verbana.data.swap_master(player_id, master_id)
+    elseif master_master_id then
+        master_id = master_master_id
+    end
+    local code = [[
+        UPDATE player
+           SET master_id = ?
+         WHERE id = ?
+    ]]
+    if not execute_bind_one(code, 'set master 1', master_id, player_id) then
+        return false, 'error'
+    end
+    local code = [[
+        UPDATE player
+           SET master_id = ?
+         WHERE master_id = ?
+    ]]
+    if not execute_bind_one(code, 'set master 2', master_id, player_id) then
+        return false, 'error'
+    end
+    return true
+end
+
+function verbana.data.swap_master(player_id, master_id)
+    if verbana.data.get_master(player_id) ~= master_id then
+        return false, 'not player\'s master'
+    end
+    local code = [[
+        UPDATE player
+           SET master_id = ?
+         WHERE id = ?
+    ]]
+    if not execute_bind_one(code, 'swap master 1', nil, player_id) then
+        return false, 'error'
+    end
+    if not execute_bind_one(code, 'swap master 2', player_id, master_id) then
+        return false, 'error'
+    end
+    local code = [[
+        UPDATE player
+           SET master_id = ?
+         WHERE master_id = ?
+    ]]
+    if not execute_bind_one(code, 'swap master 3', player_id, master_id) then
+        return false, 'error'
+    end
+    return true
+end
+
+function verbana.data.unset_master(player_id)
+    local code = [[
+        UPDATE player
+           SET master_id = NULL
+         WHERE id = ?
+    ]]
+    return execute_bind_one(code, 'unset master', player_id)
+end
+
+function verbana.data.get_alts(player_id)
+    local code = [[
+        SELECT master.name name
+          FROM player master
+         WHERE master.id == ?
+         UNION
+        SELECT alt.name
+          FROM player master
+          JOIN player alt    ON alt.master_id == master.id
+         WHERE master.id == ?
+    ]]
+    local master_id = verbana.data.get_master() or player_id
+    local rows = get_full_ntable(code, 'get alts', master_id)
+    if rows then
+        local alts = {}
+        for _, row in ipairs(rows) do
+            table.insert(alts, row.name)
+        end
+        return alts
+    end
+end
+
+function verbana.data.grep_player(pattern, limit)
+    local code = [[
+        SELECT player.name                              name
+             , COALESCE(player_status_log.status_id, ?) player_status_id
+          FROM player
+     LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
+         WHERE LOWER(player.name) GLOB LOWER(?)
+      ORDER BY LOWER(player.name)
+         LIMIT ?
+    ]]
+    return get_full_ntable(code, 'grep player', verbana.data.player_status.default.id, pattern, limit)
+end

@@ -5,8 +5,9 @@ local settings = minetest.settings
 function verbana.settings.set_universal_verification(value)
     if type(value) == 'boolean' then
         settings:set_bool('verbana.universal_verification', value)
+        verbana.settings.universal_verification = value
     else
-        verbana.log('warning', 'tried to set universal verification to %q', value)
+        verbana.log('error', 'tried to set universal verification to %q', value)
     end
 end
 

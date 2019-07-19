@@ -5,12 +5,8 @@ verbana.modname = modname
 verbana.modpath = minetest.get_modpath(modname)
 
 function verbana.log(level, message, ...)
-    local l = {... }
-    if #l ~= 0 then
-        minetest.log(level, ('[%s] %s'):format(modname, message:format(...)))
-    else
-        minetest.log(level, ('[%s] %s'):format(modname, message))
-    end
+    message = message:format(...)
+    minetest.log(level, ('[%s] %s'):format(modname, message))
 end
 
 verbana.ie = minetest.request_insecure_environment()

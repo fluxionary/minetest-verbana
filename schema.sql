@@ -7,16 +7,16 @@ CREATE TABLE IF NOT EXISTS player_status (
   CREATE INDEX IF NOT EXISTS player_status_name ON player_status(name);
 
 CREATE TABLE IF NOT EXISTS player (
-    id             INTEGER PRIMARY KEY AUTOINCREMENT
-  , name           TEXT NOT NULL
-  , main_player_id INTEGER
+    id                INTEGER PRIMARY KEY AUTOINCREMENT
+  , name              TEXT NOT NULL
+  , master_id         INTEGER
   , current_status_id INTEGER
-  , FOREIGN KEY (main_player_id) REFERENCES player(id)
+  , FOREIGN KEY (master_id)         REFERENCES player(id)
   , FOREIGN KEY (current_status_id) REFERENCES player_status_log(id)
 );
-  CREATE UNIQUE INDEX IF NOT EXISTS player_name ON player(LOWER(name));
-  CREATE INDEX IF NOT EXISTS player_main_player_id ON player(main_player_id);
-  CREATE INDEX IF NOT EXISTS player_current_status_id ON player(current_status_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS player_name              ON player(LOWER(name));
+  CREATE        INDEX IF NOT EXISTS player_master_id         ON player(master_id);
+  CREATE        INDEX IF NOT EXISTS player_current_status_id ON player(current_status_id);
 
 CREATE TABLE IF NOT EXISTS player_status_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT
@@ -131,7 +131,8 @@ CREATE TABLE IF NOT EXISTS assoc (
 CREATE TABLE IF NOT EXISTS report (
     id          INTEGER PRIMARY KEY AUTOINCREMENT
   , reporter_id INTEGER NOT NULL
-  , report      TEXT NOT NULL
+  , report      TEXT    NOT NULL
+  , timestamp   INTEGER NOT NULL
   , FOREIGN KEY (reporter_id) REFERENCES player(id)
 );
   CREATE INDEX IF NOT EXISTS report_reporter ON report(reporter_id);
