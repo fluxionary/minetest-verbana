@@ -739,6 +739,7 @@ function verbana.data.fumble_about_for_an_ip(name, player_id)
         end
     end
     if not ipstr then
+        if not player_id then player_id = verbana.data.get_player_id(name) end
         local connection_log = verbana.data.get_player_connection_log(player_id, 1)
         if not connection_log or #connection_log ~= 1 then
             log('warning', 'player %s exists but has no connection log?', player_id)

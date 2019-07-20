@@ -1203,7 +1203,7 @@ register_chatcommand('who2', {
         for _, player in ipairs(minetest.get_connected_players()) do
             table.insert(names, player:get_player_name())
         end
-        table.sort(names)
+        table.sort(names, function(a, b) return a:lower() < b:lower() end)
         for _, name in ipairs(names) do
             local player_id = data.get_player_id(name)
             local player_status = data.get_player_status(player_id)

@@ -1,1 +1,6 @@
-test! debug!
+FIX BUGS!
+
+create a way to search for players by IP/net instead of just ASN
+
+add "last login" to players table
+make way to show last login IP on certain commands (e.g. /inspect_asn)
