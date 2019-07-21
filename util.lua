@@ -105,3 +105,7 @@ function verbana.util.safe_kick_asn(caller, asn, reason)
     end
 end
 
+function verbana.util.iso_date(timestamp)
+    return os.date('%Y-%m-%dT%H:%M:%SZ', timestamp)
+end
+

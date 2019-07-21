@@ -328,7 +328,7 @@ function verbana.data.get_player_status(player_id, create_if_new)
     if cached_status then return cached_status, false end
     local code = [[
         SELECT executor.id   executor_id
-             , executor.name executor
+             , executor.name executor_name
              , status.id     id
              , status.name   name
              , log.timestamp timestamp
@@ -521,8 +521,8 @@ end
 function verbana.data.get_player_status_log(player_id)
     player_id = verbana.data.get_master(player_id) or player_id
     local code = [[
-        SELECT executor.name executor
-             , status.name   status
+        SELECT executor.name executor_name
+             , status.name   status_name
              , log.timestamp timestamp
              , log.reason    reason
              , log.expires   expires
@@ -537,8 +537,8 @@ function verbana.data.get_player_status_log(player_id)
 end
 function verbana.data.get_ip_status_log(ipint)
     local code = [[
-        SELECT executor.name executor
-             , status.name   status
+        SELECT executor.name executor_name
+             , status.name   status_name
              , log.timestamp timestamp
              , log.reason    reason
              , log.expires   expires
@@ -552,8 +552,8 @@ function verbana.data.get_ip_status_log(ipint)
 end
 function verbana.data.get_asn_status_log(asn)
     local code = [[
-        SELECT executor.name executor
-             , status.name   status
+        SELECT executor.name executor_name
+             , status.name   status_name
              , log.timestamp timestamp
              , log.reason    reason
              , log.expires   expires
@@ -753,24 +753,23 @@ end
 
 function verbana.data.get_ban_log(limit)
     local code = [[
-        SELECT player.name                 player
-             , executor.name               executor
-             , player_status.name          status
-             , player_status_log.reason    timestamp
-             , player_status_log.timestamp reason
+        SELECT player.name                 player_name
+             , executor.name               executor_name
+             , player_status.name          status_name
+             , player_status_log.timestamp timestamp
+             , player_status_log.reason    reason
              , player_status_log.expires   expires
           FROM player_status_log
           JOIN player          ON player.id        == player_status_log.player_id
           JOIN player executor ON executor.id      == player_status_log.executor_id
           JOIN player_status   ON player_status.id == player_status_log.status_id
-         WHERE player_status_log.status_id IN (?, ?)
+         WHERE player.id != (?)
          ORDER BY player_status_log.timestamp DESC
          LIMIT ?
     ]]
     if not limit or type(limit) ~= 'number' or limit < 0 then limit = 20 end
     return get_full_ntable(code, 'ban log',
-        verbana.data.player_status.banned.id,
-        verbana.data.player_status.kicked.id,
+        verbana.data.verbana_player_id,
         limit
     )
 end

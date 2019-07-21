@@ -15,6 +15,7 @@ local parse_time = util.parse_time
 local safe = util.safe
 local safe_kick_player = util.safe_kick_player
 local table_contains = util.table_contains
+local iso_date = util.iso_date
 
 local function chat_send_player(name, message, ...)
     message = message:format(...)
@@ -53,7 +54,7 @@ end
 
 register_chatcommand('sban_import', {
     description='Import records from sban',
-    params='<filename>',
+    params='[<filename>]',
     privs={[admin_priv]=true},
     func=function (caller, filename)
         if not filename or filename == '' then
@@ -71,7 +72,7 @@ register_chatcommand('sban_import', {
     end
 })
 
-register_chatcommand('universal_verification', {
+register_chatcommand('verification', {
     description='Turn universal verification on or off',
     params='on | off',
     privs={[admin_priv]=true},
@@ -94,7 +95,7 @@ register_chatcommand('universal_verification', {
 
 register_chatcommand('asn', {
     description='Get the ASN associated with an IP or player name',
-    params='<name> | <IP>',
+    params='<player_name> | <IP>',
     privs={[mod_priv]=true},
     func = function(_, name_or_ipstr)
         local ipstr
@@ -106,7 +107,7 @@ register_chatcommand('asn', {
         end
 
         if not ipstr or ipstr == '' then
-            return false, ('"%s" is not a valid ip nor a connected player'):format(name_or_ipstr)
+            return false, ('"%s" is not a valid ip nor a known player'):format(name_or_ipstr)
         end
 
         local asn, description = lib_asn.lookup(ipstr)
@@ -155,7 +156,7 @@ end
 
 register_chatcommand('verify', {
     description='Verify a player',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -200,7 +201,7 @@ register_chatcommand('verify', {
 
 register_chatcommand('unverify', {
     description='Unverify a player, revoking privs and putting them back in jail.',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -242,7 +243,7 @@ register_chatcommand('unverify', {
 
 override_chatcommand('kick', {
     description='Kick a player',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, _, reason = parse_player_status_params(params)
@@ -272,7 +273,7 @@ override_chatcommand('kick', {
 
 override_chatcommand('ban', {
     description='Ban a player. Timespan and reason are optional.',
-    params='<name> [<timespan>] [<reason>]',
+    params='<player_name> [<timespan>] [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -309,9 +310,9 @@ override_chatcommand('ban', {
         end
         if expires then
             if reason then
-                log('action', '%s banned %s until %s because %s', caller, player_name, os.date("%c", expires), reason)
+                log('action', '%s banned %s until %s because %s', caller, player_name, iso_date(expires), reason)
             else
-                log('action', '%s banned %s until %s', caller, player_name, os.date("%c", expires))
+                log('action', '%s banned %s until %s', caller, player_name, iso_date(expires))
             end
         else
             if reason then
@@ -326,7 +327,7 @@ override_chatcommand('ban', {
 
 override_chatcommand('unban', {
     description='Unban a player',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -360,7 +361,7 @@ override_chatcommand('unban', {
 
 register_chatcommand('whitelist', {
     description='Whitelist a player',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -392,7 +393,7 @@ register_chatcommand('whitelist', {
 
 register_chatcommand('unwhitelist', {
     description='Remove whitelist status from a player',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[admin_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -420,7 +421,7 @@ register_chatcommand('unwhitelist', {
 
 register_chatcommand('suspect', {
     description='Mark a player as suspicious',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -448,7 +449,7 @@ register_chatcommand('suspect', {
 
 register_chatcommand('unsuspect', {
     description='Unmark a player as suspicious',
-    params='<name> [<reason>]',
+    params='<player_name> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local player_id, player_name, player_status, reason = parse_player_status_params(params)
@@ -488,7 +489,7 @@ local function parse_ip_status_params(params)
     return ipint, ipstr, ip_status, reason
 end
 
-register_chatcommand('trust_ip', {
+register_chatcommand('ip_trust', {
     description='Mark an IP as trusted - connections will bypass suspicious network checks',
     params='<IP> [<reason>]',
     privs={[admin_priv]=true},
@@ -519,7 +520,7 @@ register_chatcommand('trust_ip', {
     end
 })
 
-register_chatcommand('untrust_ip', {
+register_chatcommand('ip_untrust', {
     description='Remove trusted status from an IP',
     params='<IP> [<reason>]',
     privs={[admin_priv]=true},
@@ -547,7 +548,7 @@ register_chatcommand('untrust_ip', {
     end
 })
 
-register_chatcommand('suspect_ip', {
+register_chatcommand('ip_suspect', {
     description='Mark an IP as suspicious.',
     params='<IP> [<reason>]',
     privs={[mod_priv]=true},
@@ -575,7 +576,7 @@ register_chatcommand('suspect_ip', {
     end
 })
 
-register_chatcommand('unsuspect_ip', {
+register_chatcommand('ip_unsuspect', {
     description='Unmark an IP as suspcious',
     params='<IP> [<reason>]',
     privs={[mod_priv]=true},
@@ -603,7 +604,7 @@ register_chatcommand('unsuspect_ip', {
     end
 })
 
-register_chatcommand('block_ip', {
+register_chatcommand('ip_block', {
     description='Block an IP from connecting.',
     params='<IP> [<reason>]',
     privs={[admin_priv]=true},
@@ -638,9 +639,9 @@ register_chatcommand('block_ip', {
         util.safe_kick_ip(ipstr)
         if expires then
             if reason then
-                log('action', '%s blocked %s until %s because %s', caller, ipstr, os.date("%c", expires), reason)
+                log('action', '%s blocked %s until %s because %s', caller, ipstr, iso_date(expires), reason)
             else
-                log('action', '%s blocked %s until %s', caller, ipstr, os.date("%c", expires))
+                log('action', '%s blocked %s until %s', caller, ipstr, iso_date(expires))
             end
         else
             if reason then
@@ -653,7 +654,7 @@ register_chatcommand('block_ip', {
     end
 })
 
-register_chatcommand('unblock_ip', {
+register_chatcommand('ip_unblock', {
     description='Unblock an IP',
     params='<IP> [<reason>]',
     privs={[admin_priv]=true},
@@ -699,7 +700,7 @@ local function parse_asn_status_params(params)
     return asn, description, asn_status, reason
 end
 
-register_chatcommand('suspect_asn', {
+register_chatcommand('asn_suspect', {
     description='Mark an ASN as suspicious.',
     params='<ASN> [<reason>]',
     privs={[mod_priv]=true},
@@ -727,7 +728,7 @@ register_chatcommand('suspect_asn', {
     end
 })
 
-register_chatcommand('unsuspect_asn', {
+register_chatcommand('asn_unsuspect', {
     description='Unmark an ASN as suspcious.',
     params='<ASN> [<reason>]',
     privs={[mod_priv]=true},
@@ -755,7 +756,7 @@ register_chatcommand('unsuspect_asn', {
     end
 })
 
-register_chatcommand('block_asn', {
+register_chatcommand('asn_block', {
     description='Block an ASN. Duration and reason optional.',
     params='<ASN> [<duration>] [<reason>]',
     privs={[admin_priv]=true},
@@ -790,9 +791,9 @@ register_chatcommand('block_asn', {
         util.safe_kick_asn(asn)
         if expires then
             if reason then
-                log('action', '%s blocked A%s until %s because %s', caller, asn, os.date("%c", expires), reason)
+                log('action', '%s blocked A%s until %s because %s', caller, asn, iso_date(expires), reason)
             else
-                log('action', '%s blocked A%s until %s ', caller, asn, os.date("%c", expires))
+                log('action', '%s blocked A%s until %s ', caller, asn, iso_date(expires))
             end
         else
             if reason then
@@ -805,7 +806,7 @@ register_chatcommand('block_asn', {
     end
 })
 
-register_chatcommand('unblock_asn', {
+register_chatcommand('asn_unblock', {
     description='Unblock an ASN.',
     params='<ASN> [<reason>]',
     privs={[admin_priv]=true},
@@ -835,7 +836,7 @@ register_chatcommand('unblock_asn', {
 ---------------- GET LOGS ---------------
 register_chatcommand('ban_record', {
     description='shows the status log of a player',
-    params='<name> [<number>]',
+    params='<player_name> [<number>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local name, numberstr = string.match(params, '^([%a%d_-]+)%s+(%d+)$')
@@ -865,14 +866,18 @@ register_chatcommand('ban_record', {
         end
         for index = starti,#rows do
             local row = rows[index]
-            local message = ('%s: %s set status to %s.'):format(os.date("%c", row.timestamp), row.executor, row.status)
+            local message = ('%s: %s set status to %s.'):format(
+                iso_date(row.timestamp),
+                row.executor_name,
+                row.status_name
+            )
             local reason = row.reason
             if reason and reason ~= '' then
                 message = ('%s Reason: %s'):format(message, reason)
             end
             local expires = row.expires
             if expires then
-                message = ('%s Expires: %s'):format(message, os.date("%c", expires))
+                message = ('%s Expires: %s'):format(message, iso_date(expires))
             end
             chat_send_player(caller, message)
         end
@@ -880,7 +885,7 @@ register_chatcommand('ban_record', {
     end
 })
 
-register_chatcommand('ip_status_log', {
+register_chatcommand('ip_record', {
     description='shows the status log of an IP',
     params='<IP> [<number>]',
     privs={[mod_priv]=true},
@@ -909,23 +914,26 @@ register_chatcommand('ip_status_log', {
         end
         for index = starti,#rows do
             local row = rows[index]
-            local message = ('%s: %s set status to %s.'):format(os.date("%c", row.timestamp), row.executor, row.status)
+            local message = ('%s: %s set status to %s.'):format(
+                iso_date(row.timestamp),
+                row.executor_name,
+                row.status_name
+            )
             local reason = row.reason
             if reason and reason ~= '' then
                 message = ('%s Reason: %s'):format(message, reason)
             end
             local expires = row.expires
             if expires then
-                message = ('%s Expires: %s'):format(message, os.date("%c", expires))
+                message = ('%s Expires: %s'):format(message, iso_date(expires))
             end
             chat_send_player(caller, message)
         end
         return true
     end
 })
-alias_chatcommand('isl', 'ip_status_log')
 
-register_chatcommand('asn_status_log', {
+register_chatcommand('asn_record', {
     description='shows the status log of an ASN',
     params='<ASN> [<number>]',
     privs={[mod_priv]=true},
@@ -954,40 +962,42 @@ register_chatcommand('asn_status_log', {
         end
         for index = starti,#rows do
             local row = rows[index]
-            local message = ('%s: %s set status to %s.'):format(os.date("%c", row.timestamp), row.executor, row.status)
+            local message = ('%s: %s set status to %s.'):format(
+                iso_date(row.timestamp),
+                row.executor_name,
+                row.status_name
+            )
             local reason = row.reason
             if reason and reason ~= '' then
                 message = ('%s Reason: %s'):format(message, reason)
             end
             local expires = row.expires
             if expires then
-                message = ('%s Expires: %s'):format(message, os.date("%c", expires))
+                message = ('%s Expires: %s'):format(message, iso_date(expires))
             end
             chat_send_player(caller, message)
         end
         return true
     end
 })
-alias_chatcommand('asl', 'asn_status_log')
 
 register_chatcommand('logins', {
     description='shows the login record of a player',
-    params='<name> [<number>=20]',
+    params='<player_name> [<number>=20]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local name, limit = params:match('^([a-zA-Z0-9_-]+)%s+(%d+)$')
+        limit = tonumber(limit)
         if not name then
             name = params:match('^([a-zA-Z0-9_-]+)$')
-        end
-        if not name then
-            return false, 'invalid arguments'
-        end
-        if not limit then
             limit = 20
+        end
+        if not name or not limit then
+            return false, 'Invalid arguments'
         end
         local player_id = data.get_player_id(name)
         if not player_id then
-            return false, 'unknown player'
+            return false, 'Unknown player'
         end
         local rows = data.get_player_connection_log(player_id, limit)
         if not rows then
@@ -998,7 +1008,7 @@ register_chatcommand('logins', {
         end
         for _, row in ipairs(rows) do
             local message = ('%s:%s from %s<%s> A%s<%s> (%s)'):format(
-                os.date("%c", row.timestamp),
+                iso_date(row.timestamp),
                 (rows.success and ' failed!') or '',
                 lib_ip.ipint_to_ipstr(row.ipint),
                 data.ip_status_name[row.ip_status_id or data.ip_status.default.id],
@@ -1014,7 +1024,7 @@ register_chatcommand('logins', {
 
 register_chatcommand('inspect', {
     description='List IPs and ASNs associated with a player',
-    params='<name>',
+    params='<player_name>',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local name = params:match('^([a-zA-Z0-9_-]+)$')
@@ -1049,7 +1059,7 @@ register_chatcommand('inspect', {
     end
 })
 
-register_chatcommand('inspect_ip', {
+register_chatcommand('ip_inspect', {
     description='list player accounts and statuses associated with an IP',
     params='<IP> [<timespan>=1w]',
     privs={[mod_priv]=true},
@@ -1090,9 +1100,8 @@ register_chatcommand('inspect_ip', {
         return true
     end
 })
-alias_chatcommand('iip', 'inspect_ip')
 
-register_chatcommand('inspect_asn', {
+register_chatcommand('asn_inspect', {
     description='list player accounts and statuses associated with an ASN',
     params='<ASN> [<timespan>=1w]',
     privs={[mod_priv]=true},
@@ -1134,7 +1143,6 @@ register_chatcommand('inspect_asn', {
         return true
     end
 })
-alias_chatcommand('ias', 'inspect_asn')
 
 register_chatcommand('asn_stats', {
     description='Get statistics for an ASN',
@@ -1230,7 +1238,7 @@ register_chatcommand('who2', {
     end
 })
 
-register_chatcommand('banlog', {
+register_chatcommand('bans', {
     description='Get a list of recent player status changes',
     params='[<number>=20]',
     privs={[mod_priv]=true},
@@ -1254,10 +1262,18 @@ register_chatcommand('banlog', {
             return true, 'No records found.'
         end
         for _, row in ipairs(rows) do
-            local message = ('% 20s: %s'):format(
-                row.player_name,
-                row.player_status_name or data.player_status.default.name
+            local message = ('%s: %s %s %s'):format(
+                iso_date(row.timestamp),
+                row.executor_name,
+                row.status_name,
+                row.player_name
             )
+            if row.expires then
+                message = message .. (' until %s'):format(iso_date(row.expires))
+            end
+            if row.reason then
+                message = message .. (' because %s'):format(row.reason)
+            end
             chat_send_player(caller, message)
         end
     end
@@ -1320,7 +1336,7 @@ register_chatcommand('reports', {
         end
         for _, row in ipairs(rows) do
             local message = ('%s % 20s: %s'):format(
-                os.date("%c", row.timestamp),
+                iso_date(row.timestamp),
                 row.reporter,
                 row.report
             )
@@ -1331,7 +1347,7 @@ register_chatcommand('reports', {
 
 register_chatcommand('first-login', {
     description='Get the first login time of any player or yourself.',
-    params='[<name>]',
+    params='[<player_name>]',
     func=function(reporter, params)
         if params == '' then
             params = reporter
@@ -1346,11 +1362,11 @@ register_chatcommand('first-login', {
         elseif #rows == 0 then
             return true, 'No record of player logging in'
         end
-        return true, os.date('%c', rows[1].timestamp)
+        return true, iso_date(rows[1].timestamp)
     end
 })
 
-register_chatcommand('set_master', {
+register_chatcommand('master', {
     description='Set the master account of an alt account',
     params='<alt> <master>',
     privs={[mod_priv]=true},
@@ -1385,9 +1401,9 @@ register_chatcommand('set_master', {
     end
 })
 
-register_chatcommand('remove_master', {
+register_chatcommand('master_rm', {
     description='Remove the master from an alt account',
-    params='<alt>',
+    params='<player_name>',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local alt_name = params:match('^%s*([a-zA-Z0-9_-]+)%s*$')
@@ -1409,8 +1425,8 @@ register_chatcommand('remove_master', {
     end
 })
 
-register_chatcommand('grep_player', {
-    description='Search for players by name, using a SQLite GLOB expressions',
+register_chatcommand('pgrep', {
+    description='Search for players by name, using a SQLite GLOB expression (e.g. "*foo*")',
     params='<pattern> [<limit>=20]',
     privs={[mod_priv]=true},
     func=function(caller, params)

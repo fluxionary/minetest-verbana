@@ -7,6 +7,7 @@ local settings = verbana.settings
 local util = verbana.util
 
 local safe = util.safe
+local iso_date = util.iso_date
 
 local spawn_pos = settings.spawn_pos
 local unverified_spawn_pos = settings.unverified_spawn_pos
@@ -121,7 +122,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     elseif player_status.id == data.player_status.banned.id then
         local reason = player_status.reason
         if player_status.expires then
-            local expires = os.date("%c", player_status.expires or now)
+            local expires = iso_date(player_status.expires or now)
             if reason and reason ~= '' then
                 return_value = ('Account %q is banned until %s because %q.'):format(name, expires, reason)
             else
@@ -137,7 +138,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     elseif ip_status.id == data.ip_status.blocked.id then
         local reason = ip_status.reason
         if ip_status.expires then
-            local expires = os.date("%c", ip_status.expires or now)
+            local expires = iso_date(ip_status.expires or now)
             if reason and reason ~= '' then
                 return_value = ('IP %q is blocked until %s because %q.'):format(ipstr, expires, reason)
             else
@@ -155,7 +156,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     elseif asn_status.id == data.asn_status.blocked.id then
         local reason = asn_status.reason
         if asn_status.expires then
-        local expires = os.date("%c", asn_status.expires or now)
+        local expires = iso_date(asn_status.expires or now)
             if reason and reason ~= '' then
                 return_value = ('Network %s (%s) is blocked until %s because %q.'):format(asn, asn_description, expires, reason)
             else
