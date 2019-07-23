@@ -3,9 +3,6 @@ verbana.chat = {}
 local data = verbana.data
 local privs = verbana.privs
 
-local mod_priv = privs.moderator
-local admin_priv = privs.admin
-
 function verbana.chat.tell_mods(message, ...)
     message = message:format(...)
     if minetest.global_exists('irc') then irc:say(message) end

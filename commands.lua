@@ -724,7 +724,7 @@ register_chatcommand('asn_suspect', {
         else
             log('action', '%s suspected A%s', caller, asn)
         end
-        return true, ('Suspected A%s'):format(asn)
+        return true, ('Suspected A%s (%s)'):format(asn, description)
     end
 })
 
@@ -752,7 +752,7 @@ register_chatcommand('asn_unsuspect', {
         else
             log('action', '%s unsuspected A%s', caller, asn)
         end
-        return true, ('Unsuspected A%s'):format(asn)
+        return true, ('Unsuspected A%s (%q)'):format(asn, description)
     end
 })
 
@@ -802,7 +802,7 @@ register_chatcommand('asn_block', {
                 log('action', '%s blocked A%s', caller, asn)
             end
         end
-        return true, ('Blocked A%s'):format(asn)
+        return true, ('Blocked A%s (%q)'):format(asn, description)
     end
 })
 
@@ -830,7 +830,7 @@ register_chatcommand('asn_unblock', {
         else
             log('action', '%s unblocked A%s', caller, asn)
         end
-        return true, ('Unblocked A%s'):format(asn)
+        return true, ('Unblocked A%s (%q)'):format(asn, description)
     end
 })
 ---------------- GET LOGS ---------------
@@ -1081,7 +1081,6 @@ register_chatcommand('ip_inspect', {
             timespan = 60*60*24*7
         end
         local ipint = lib_ip.ipstr_to_ipint(ipstr)
-        local start_time = os.time() - timespan
         local rows = data.get_ip_associations(ipint, timespan)
         if not rows then
             return false, 'An error occurred (see server logs)'
@@ -1206,7 +1205,7 @@ register_chatcommand('cluster', {
 register_chatcommand('who2', {
     description='Show current connected players, statuses, and sources',
     privs={[mod_priv]=true},
-    func=function(caller, params)
+    func=function(caller)
         local names = {}
         for _, player in ipairs(minetest.get_connected_players()) do
             table.insert(names, player:get_player_name())
@@ -1382,8 +1381,8 @@ register_chatcommand('master', {
         elseif not master_id then
             return false, ('Unknown player %s'):format(master_name)
         end
-        local status, message = data.set_master(alt_id, master_id)
-        if not status then
+        local set_status, message = data.set_master(alt_id, master_id)
+        if not set_status then
             return false, ('An error occured (%s). Check logs.'):format(message)
         end
         local true_master_id, true_master_name = data.get_master(alt_id)

@@ -12,7 +12,7 @@ function verbana.settings.set_universal_verification(value)
 end
 
 local function get_setting(name, default)
-    local setting = settings:get('verbana.db_path')
+    local setting = settings:get(name)
     if not setting or setting == '' then
         return default
     end

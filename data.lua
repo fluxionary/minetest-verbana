@@ -219,7 +219,7 @@ function verbana.data.import_from_sban(filename)
     if not insert_assoc_statement then return _error() end
     local insert_log_statement = prepare('INSERT OR IGNORE INTO connection_log (player_id, ip, asn, success, timestamp) VALUES (?, ?, ?, ?, ?)', 'insert connection log')
     if not insert_log_statement then return _error() end
-    for name, ipstr, created, last_login in sban_db:urows('SELECT name, ip, created, last_login FROM playerdata') do
+    for name, ipstr, created in sban_db:urows('SELECT name, ip, created FROM playerdata') do
         local player_id = player_id_by_name[name]
         if not lib_ip.is_valid_ip(ipstr) then
             return _error('%s is not a valid IPv4 address', ipstr)
@@ -367,7 +367,7 @@ function verbana.data.set_player_status(player_id, executor_id, status_id, reaso
     if not execute_bind_one(code, 'set player status', player_id, executor_id, status_id, reason, expires, os.time()) then return false end
     if not no_update_current then
         local last_id = db:last_insert_rowid()
-        local code = 'UPDATE player SET current_status_id = ? WHERE id = ?'
+        code = 'UPDATE player SET current_status_id = ? WHERE id = ?'
         if not execute_bind_one(code, 'update player last status id', last_id, player_id) then return false end
     end
     return true
@@ -384,7 +384,7 @@ function verbana.data.get_ip_status(ipint, create_if_new)
     if cached_status then return cached_status end
     local code = [[
         SELECT executor.id   executor_id
-             , executor.name executor
+             , executor.name executor_name
              , status.id     id
              , status.name   name
              , log.timestamp timestamp
@@ -421,7 +421,7 @@ function verbana.data.set_ip_status(ipint, executor_id, status_id, reason, expir
     ]]
     if not execute_bind_one(code, 'set ip status', ipint, executor_id, status_id, reason, expires, os.time()) then return false end
     local last_id = db:last_insert_rowid()
-    local code = 'UPDATE ip SET current_status_id = ? WHERE ip = ?'
+    code = 'UPDATE ip SET current_status_id = ? WHERE ip = ?'
     if not execute_bind_one(code, 'update ip last status id', last_id, ipint) then return false end
     return true
 end
@@ -437,7 +437,7 @@ function verbana.data.get_asn_status(asn, create_if_new)
     if cached_status then return cached_status end
     local code = [[
         SELECT executor.id   executor_id
-             , executor.name executor
+             , executor.name executor_name
              , status.id     id
              , status.name   name
              , log.timestamp timestamp
@@ -474,7 +474,7 @@ function verbana.data.set_asn_status(asn, executor_id, status_id, reason, expire
     ]]
     if not execute_bind_one(code, 'set asn status', asn, executor_id, status_id, reason, expires, os.time()) then return false end
     local last_id = db:last_insert_rowid()
-    local code = 'UPDATE asn SET current_status_id = ? WHERE asn = ?'
+    code = 'UPDATE asn SET current_status_id = ? WHERE asn = ?'
     if not execute_bind_one(code, 'update asn last status id', last_id, asn) then return false end
     return true
 end
@@ -648,6 +648,32 @@ function verbana.data.get_asn_connection_log(asn, limit)
     local t = get_full_ntable(code, 'asn connection log', asn, limit)
     return verbana.util.table_reversed(t)
 end
+
+function verbana.data.get_network_connection_log(asn, limit)
+    local code = [[
+        SELECT player.name                 player_name
+             , player.id                   player_id
+             , log.ip                      ipint
+             , log.success                 success
+             , log.timestamp               timestamp
+             , player_status_log.status_id player_status_id
+             , ip.current_status_id        ip_status_id
+          FROM connection_log log
+          JOIN player            ON player.id == log.player_id
+     LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
+          JOIN ip                ON ip.ip == log.ip
+     LEFT JOIN ip_status_log     ON ip.current_status_id == ip_status_log.id
+         WHERE log.asn == ?
+      ORDER BY timestamp DESC
+         LIMIT ?
+    ]]
+    if not limit or type(limit) ~= 'number' or limit < 0 then
+        limit = 20
+    end
+    local t = get_full_ntable(code, 'asn connection log', asn, limit)
+    return verbana.util.table_reversed(t)
+end
+
 
 function verbana.data.get_player_associations(player_id)
     local code = [[
@@ -855,7 +881,7 @@ function verbana.data.set_master(player_id, master_id)
     if not execute_bind_one(code, 'set master 1', master_id, player_id) then
         return false, 'error'
     end
-    local code = [[
+    code = [[
         UPDATE player
            SET master_id = ?
          WHERE master_id = ?
@@ -881,7 +907,7 @@ function verbana.data.swap_master(player_id, master_id)
     if not execute_bind_one(code, 'swap master 2', player_id, master_id) then
         return false, 'error'
     end
-    local code = [[
+    code = [[
         UPDATE player
            SET master_id = ?
          WHERE master_id = ?
