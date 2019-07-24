@@ -7,7 +7,7 @@ verbana.asn_description_path (Location of the ASN description file) string
 # The location of the ASN data file (default: in the verbana mod folder)
 verbana.asn_data_path (Location of the ASN data file) string
 
-# The privilege of the Verbana adminstrator(s)
+# The privilege of the Verbana administrator(s)
 verbana.admin_priv (Priv required for Verbana administration) string ban_admin
 
 # The privilege of the Verbana moderator(s)
@@ -33,5 +33,5 @@ verbana.jail_check_period (Timespan between checks for verification jail escapee
 verbana.universal_verification (Enable verification for all new users) bool false
 
 # In debug mode, Verbana will not block any players from connecting, change their privileges,
-# or anything else that affects gameplay.
+# or anything else that affects game-play.
 verbana.debug_mode (Whether to run verbana in debug mode) bool true

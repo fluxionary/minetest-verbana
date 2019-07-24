@@ -5,39 +5,29 @@ create a way to search for players by IP/net instead of just ASN
 add "last login" to players table
 make way to show last login IP on certain commands (e.g. /inspect_asn)
 
+make settings for the hard-coded values for reporting timing
+alert staff if there are new reports since their last login
+a way to resolve reports?
 --------------
 
+# Administration
 sban_import  [<filename>]
 verification on | off
 
+# General status
+reports [<timespan>=1w]
+bans    [<number>=20]
+who2
 
-asn <player_name> | <IP>
-
-asn_inspect <ASN> [<timespan>=1w]
-asn_record  <ASN> [<number>]
-
-asn_block     <ASN> [<timespan>] [<reason>]
-asn_stats     <ASN> [<reason>]
-asn_suspect   <ASN> [<reason>]
-asn_unblock   <ASN> [<reason>]
-asn_unsuspect <ASN> [<reason>]
-
-ip_inspect <IP> [<timespan>=1w]
-ip_record  <IP> [<number>]
-
-ip_block     <IP> [<timespan>] [<reason>]
-ip_unblock   <IP> [<reason>]
-ip_suspect   <IP> [<reason>]
-ip_unsuspect <IP> [<reason>]
-ip_trust     <IP> [<reason>]
-ip_untrust   <IP> [<reason>]
-
+# Player inspection
 pgrep      <pattern> [<limit>=20]
+asn        <player_name> | <IP>
 cluster    <player_name>
 inspect    <player_name>
 ban_record <player_name> [<number>]
 logins     <player_name> [<number>=20]
 
+# Player management
 kick        <player_name> [<reason>]
 ban         <player_name> [<timespan>] [<reason>]
 unban       <player_name> [<reason>]
@@ -47,15 +37,32 @@ verify      <player_name> [<reason>]
 unverify    <player_name> [<reason>]
 whitelist   <player_name> [<reason>]
 unwhitelist <player_name> [<reason>]
-
 master     <alt> <master>
 master_rm  <player_name>
 
+# IP inspection
+ip_inspect <IP> [<timespan>=1w]
+ip_record  <IP> [<number>]
 
-report
-reports
+# IP management
+ip_block     <IP> [<timespan>] [<reason>]
+ip_unblock   <IP> [<reason>]
+ip_suspect   <IP> [<reason>]
+ip_unsuspect <IP> [<reason>]
+ip_trust     <IP> [<reason>]
+ip_untrust   <IP> [<reason>]
 
+# ASN inspection
+asn_inspect <ASN> [<timespan>=1w]
+asn_record  <ASN> [<number>]
+asn_stats   <ASN>
 
+# ASN management
+asn_block     <ASN> [<timespan>] [<reason>]
+asn_unblock   <ASN> [<reason>]
+asn_suspect   <ASN> [<reason>]
+asn_unsuspect <ASN> [<reason>]
+
+# Available to all players
+report  <message>
 first-login <player_name>
-who2
-bans [<number>=20]

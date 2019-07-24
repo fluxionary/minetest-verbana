@@ -18,7 +18,7 @@ end
 
 -- make this the first chat message handler by inserting it at the start.
 -- this has the effect of
---   (1) pre-empting irc (and irc2)
+--   (1) preempting irc (and irc2)
 --   (2) disabling all server-side commands
 table.insert(minetest.registered_on_chat_messages, 1,
     function(name, message)

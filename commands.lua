@@ -45,7 +45,7 @@ local function alias_chatcommand(name, existing_name)
     end
     local existing_def = minetest.registered_chatcommands[existing_name]
     if not existing_def then
-        verbana.log('error', 'Could not alias command %q to %q, because %q doesn\'t exist', name, existing_name, existing_name)
+        verbana.log('error', "Could not alias command %q to %q, because %q doesn't exist", name, existing_name, existing_name)
     else
         minetest.register_chatcommand(name, existing_def)
     end
@@ -83,7 +83,7 @@ register_chatcommand('verification', {
         elseif params == 'off' then
             value = false
         else
-            return false, 'Invalid paramters'
+            return false, 'Invalid parameters'
         end
         if verbana.settings.universal_verification == value then
             return true, ('Universal verification is already %s'):format(params)
@@ -577,7 +577,7 @@ register_chatcommand('ip_suspect', {
 })
 
 register_chatcommand('ip_unsuspect', {
-    description='Unmark an IP as suspcious',
+    description='Unmark an IP as suspicious',
     params='<IP> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -729,7 +729,7 @@ register_chatcommand('asn_suspect', {
 })
 
 register_chatcommand('asn_unsuspect', {
-    description='Unmark an ASN as suspcious.',
+    description='Unmark an ASN as suspicious.',
     params='<ASN> [<reason>]',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -1011,9 +1011,9 @@ register_chatcommand('logins', {
                 iso_date(row.timestamp),
                 (rows.success and ' failed!') or '',
                 lib_ip.ipint_to_ipstr(row.ipint),
-                data.ip_status_name[row.ip_status_id or data.ip_status.default.id],
+                data.ip_status_name[row.ip_status_id] or data.ip_status.default.name,
                 row.asn,
-                data.asn_status_name[row.asn_status_id or data.asn_status.default.id],
+                data.asn_status_name[row.asn_status_id] or data.asn_status.default.name,
                 lib_asn.get_description(row.asn)
             )
             chat_send_player(caller, message)
@@ -1048,10 +1048,10 @@ register_chatcommand('inspect', {
             local asn_description = lib_asn.get_description(row.asn)
             local message = ('%s<%s> A%s (%s) <%s>'):format(
                 ipstr,
-                data.ip_status_name[row.ip_status_id or data.ip_status.default.id],
+                data.ip_status_name[row.ip_status_id] or data.ip_status.default.name,
                 row.asn,
                 asn_description,
-                data.asn_status_name[row.asn_status_id or data.asn_status.default.id]
+                data.asn_status_name[row.asn_status_id] or data.asn_status.default.name
             )
             chat_send_player(caller, message)
         end
@@ -1092,7 +1092,7 @@ register_chatcommand('ip_inspect', {
         for _, row in ipairs(rows) do
             local message = ('% 20s: %s'):format(
                 row.player_name,
-                data.player_status_name[row.player_status_id or data.player_status.default.id]
+                data.player_status_name[row.player_status_id] or data.player_status.default.name
             )
             chat_send_player(caller, message)
         end
@@ -1135,7 +1135,7 @@ register_chatcommand('asn_inspect', {
         for _, row in ipairs(rows) do
             local message = ('% 20s: %s'):format(
                 row.player_name,
-                data.player_status_name[row.player_status_id or data.player_status.default.id]
+                data.player_status_name[row.player_status_id] or data.player_status.default.name
             )
             chat_send_player(caller, message)
         end
@@ -1163,7 +1163,7 @@ register_chatcommand('asn_stats', {
         chat_send_player(caller, ('Statistics for %s:'):format(asn_description))
         for _, row in ipairs(rows) do
             chat_send_player(caller, ('%s %s'):format(
-                data.player_status_name[row.player_status_id or data.player_status.default.id],
+                data.player_status_name[row.player_status_id] or data.player_status.default.name,
                 row.count
             ))
         end
@@ -1194,7 +1194,7 @@ register_chatcommand('cluster', {
         for _, row in ipairs(rows) do
             local message = ('% 20s: %s'):format(
                 row.player_name,
-                data.player_status_name[row.player_status_id or data.player_status.default.id]
+                data.player_status_name[row.player_status_id] or data.player_status.default.name
             )
             chat_send_player(caller, message)
         end
@@ -1357,7 +1357,7 @@ register_chatcommand('first-login', {
         end
         local rows = data.get_first_login(player_id)
         if not rows then
-            return false, 'An error occured. See server logs.'
+            return false, 'An error occurred. See server logs.'
         elseif #rows == 0 then
             return true, 'No record of player logging in'
         end
@@ -1446,7 +1446,7 @@ register_chatcommand('pgrep', {
         for _, row in ipairs(rows) do
             chat_send_player(caller, '%s %s',
                 row.name,
-                data.player_status_name[row.player_status_id or data.player_status.default.id]
+                data.player_status_name[row.player_status_id] or data.player_status.default.name
             )
         end
         return true
