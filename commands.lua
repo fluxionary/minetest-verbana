@@ -912,14 +912,14 @@ register_chatcommand('ban_record', {
         chat_send_player(caller, table.concat(clustered, ', '))
 
         chat_send_player(caller, "Flagged accounts on the same ASN:")
-        rows = data.get_asn_associations(asn, '1y')
+        rows = data.get_asn_associations(asn, os.time() - parse_time('1y'))
         if not rows then return false, 'An error occurred (see server logs)' end
         local assocs = {}
         for _, row in ipairs(rows) do
             local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
             table.insert(assocs, minetest.colorize(color, row.player_name))
         end
-        chat_send_player(caller, table.concat(clustered, ', '))
+        chat_send_player(caller, table.concat(assocs, ', '))
 
         chat_send_player(caller, "Account status:")
         rows = data.get_player_status_log(player_id)

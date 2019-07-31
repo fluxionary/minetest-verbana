@@ -13,10 +13,10 @@ data.version = 1
 
 -- constants
 data.player_status = {
-    default={name='default', id=1, color='#0F0'},
+    default={name='default', id=1, color='#FFF'},
     suspicious={name='suspicious', id=2, color='#FF0'},
     banned={name='banned', id=3, color='#F00'},
-    whitelisted={name='whitelisted', id=4, color='#FFF'},
+    whitelisted={name='whitelisted', id=4, color='#0F0'},
     unverified={name='unverified', id=5, color='#00F'},
     kicked={name='kicked', id=6, color='#F0F'},  -- for logging kicks
 }
@@ -28,10 +28,10 @@ for _, value in pairs(data.player_status) do
 end
 
 data.ip_status = {
-    default={name='default', id=1, color='#0F0'},
+    default={name='default', id=1, color='#FFF'},
     suspicious={name='suspicious', id=2, color='#FF0'},
     blocked={name='blocked', id=3, color='#F00'},
-    trusted={name='trusted', id=4, color='#FFF'},
+    trusted={name='trusted', id=4, color='#0F0'},
 }
 data.ip_status_name = {}
 data.ip_status_color = {}
@@ -41,7 +41,7 @@ for _, value in pairs(data.ip_status) do
 end
 
 data.asn_status = {
-    default={name='default', id=1, color='#0F0'},
+    default={name='default', id=1, color='#FFF'},
     suspicious={name='suspicious', id=2, color='#FF0'},
     blocked={name='blocked', id=3, color='#FF0'},
 }
@@ -870,10 +870,9 @@ function data.get_ip_associations(ipint, from_time)
       DISTINCT player.name                 player_name
              , player_status_log.status_id player_status_id
           FROM assoc
+          JOIN connection_log USING (ip, asn)
           JOIN player            ON player.id == assoc.player_id
      LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
-          JOIN connection_log    ON connection_log.ip == assoc.ip
-                                AND connection_log.asn == assoc.asn
          WHERE assoc.ip == ?
            AND connection_log.timestamp >= ?
       ORDER BY LOWER(player.name)
@@ -885,13 +884,13 @@ function data.get_asn_associations(asn, from_time)
         SELECT
       DISTINCT player.name                 player_name
              , player_status_log.status_id player_status_id
-             , connection_log.ip           ipint
-             , connection_log.asn          asn
+             , last_log.ip                 ipint
+             , last_log.asn                asn
           FROM assoc
-          JOIN connection_log USING (ip, asn)
-          JOIN player            ON player.id == assoc.player_id
-     LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
-     LEFT JOIN connection_log    ON connection_log.id == player.last_login_id
+          JOIN connection_log       USING (ip, asn)
+          JOIN player                  ON player.id == assoc.player_id
+     LEFT JOIN player_status_log       ON player_status_log.id == player.current_status_id
+     LEFT JOIN connection_log last_log ON last_log.id == player.last_login_id
          WHERE assoc.asn == ?
            AND connection_log.timestamp >= ?
            AND player.flagged == TRUE
