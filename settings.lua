@@ -63,6 +63,16 @@ verbana.settings.universal_verification = settings:get_bool('verbana.universal_v
 verbana.settings.jail_bounds = get_jail_bounds()
 verbana.settings.jail_check_period = get_setting('verbana.jail_check_period')
 
--- TODO: remove the default 'true' setting when we are ready
-verbana.settings.debug_mode = get_setting('verbana.debug_mode', 'true') == 'true'
+local debug_is_default -- we revert to debug mode if verification or sban is enabled
+if ((
+        minetest.get_modpath('sban') and
+        minetest.registered_chatcommands['bang'] -- sban doesn't publish an API, so use this as a proxy
+    ) or (
+        minetest.global_exists('verification')
+    )) then
+    debug_is_default = 'true'
+else
+    debug_is_default = 'false'
+end
+verbana.settings.debug_mode = get_setting('verbana.debug_mode', debug_is_default) == 'true'
 

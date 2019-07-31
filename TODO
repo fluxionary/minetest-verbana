@@ -1,23 +1,22 @@
 
-rework /asn_inspect
-- count number of entries a player has in the status table
-- only report players that have more than one entry in that table
-
 rework /ban_record
 - make it a summary of whether a player might be suspicious based on known associations
 - like sban's ban record
-- function currently named ban_record would be renamed "status"
+- function currently named ban_record would be renamed "record"
 - "so you want to specify his name, and see a list of banned/troublesome accounts from his ASN."
 - "so with one command, I should see, perhaps, IP-linked accounts, first and last login, ban record, and flagged accounts sharing their asn"
 
 create a way to search for players by IP/net instead of just ASN
 
-add "last login" to players table
 make way to show last login IP on certain commands (e.g. /inspect_asn)
 
 make settings for the hard-coded values for reporting timing
+
 alert staff if there are new reports since their last login
+
 a way to resolve reports?
+
+DOCUMENTATION....
 --------------
 
 # Administration

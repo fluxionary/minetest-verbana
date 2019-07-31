@@ -18,6 +18,10 @@ end
 dofile(verbana.modpath .. '/settings.lua')
 dofile(verbana.modpath .. '/privs.lua')
 
+if verbana.settings.debug_mode then
+    verbana.log('warning', 'Verbana is running in debug mode.')
+end
+
 -- libraries
 dofile(verbana.modpath .. '/util.lua')
 dofile(verbana.modpath .. '/lib_ip.lua')
@@ -25,6 +29,9 @@ dofile(verbana.modpath .. '/lib_asn.lua')
 
 -- connect to the DB - MAKE SURE TO CLEAN UP ALL "insecure" access points!
 local sql = verbana.ie.require('lsqlite3') -- TODO what happens if this isn't installed? ....
+if not sql then
+    error('Verbana will not work unless lsqlite3 is installed. See README.txt')
+end
 verbana.sql = sql
 local db_location = verbana.settings.db_path
 local db, _, errmsg = sql.open(db_location)

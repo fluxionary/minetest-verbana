@@ -1,42 +1,73 @@
 verbana.data = {}
 
+local data = verbana.data
 local lib_asn = verbana.lib_asn
 local lib_ip = verbana.lib_ip
+local util = verbana.util
 local log = verbana.log
 
 local sql = verbana.sql
 local db = verbana.db
 
+data.version = 1
+
 -- constants
-verbana.data.player_status = {
-    default={name='default', id=1},
-    suspicious={name='suspicious', id=2},
-    banned={name='banned', id=3},
-    whitelisted={name='whitelisted', id=4},
-    unverified={name='unverified', id=5},
-    kicked={name='kicked', id=6},  -- for logging kicks
+data.player_status = {
+    default={name='default', id=1, color='#0F0'},
+    suspicious={name='suspicious', id=2, color='#FF0'},
+    banned={name='banned', id=3, color='#F00'},
+    whitelisted={name='whitelisted', id=4, color='#FFF'},
+    unverified={name='unverified', id=5, color='#00F'},
+    kicked={name='kicked', id=6, color='#F0F'},  -- for logging kicks
 }
-verbana.data.player_status_name = {}
-for _, value in pairs(verbana.data.player_status) do verbana.data.player_status_name[value.id] = value.name end
-verbana.data.ip_status = {
-    default={name='default', id=1},
-    suspicious={name='suspicious', id=2},
-    blocked={name='blocked', id=3},
-    trusted={name='trusted', id=4},
+data.player_status_name = {}
+data.player_status_color = {}
+for _, value in pairs(data.player_status) do
+    data.player_status_name[value.id] = value.name
+    data.player_status_color[value.id] = value.color
+end
+
+data.ip_status = {
+    default={name='default', id=1, color='#0F0'},
+    suspicious={name='suspicious', id=2, color='#FF0'},
+    blocked={name='blocked', id=3, color='#F00'},
+    trusted={name='trusted', id=4, color='#FFF'},
 }
-verbana.data.ip_status_name = {}
-for _, value in pairs(verbana.data.ip_status) do verbana.data.ip_status_name[value.id] = value.name end
-verbana.data.asn_status = {
-    default={name='default', id=1},
-    suspicious={name='suspicious', id=2},
-    blocked={name='blocked', id=3},
+data.ip_status_name = {}
+data.ip_status_color = {}
+for _, value in pairs(data.ip_status) do
+    data.ip_status_name[value.id] = value.name
+    data.ip_status_color[value.id] = value.color
+end
+
+data.asn_status = {
+    default={name='default', id=1, color='#0F0'},
+    suspicious={name='suspicious', id=2, color='#FF0'},
+    blocked={name='blocked', id=3, color='#FF0'},
 }
-verbana.data.asn_status_name = {}
-for _, value in pairs(verbana.data.asn_status) do verbana.data.asn_status_name[value.id] = value.name end
-verbana.data.verbana_player = '!verbana!'
-verbana.data.verbana_player_id = 1
+data.asn_status_name = {}
+data.asn_status_color = {}
+for _, value in pairs(data.asn_status) do
+    data.asn_status_name[value.id] = value.name
+    data.asn_status_color[value.id] = value.color
+end
+
+data.verbana_player = '!verbana!'
+data.verbana_player_id = 1
+
 -- wrap sqllite API to make error reporting less messy
+local function check_description(description)
+    return (
+        type(description) == 'string' and
+        description ~= ''
+    )
+end
+
 local function execute(code, description)
+    if not check_description(description) then
+        log('error', 'bad description for execute: %q', tostring(description))
+        return false
+    end
     if db:exec(code) ~= sql.OK then
         log('error', 'executing %s %q: %s', description, code, db:errmsg())
         return false
@@ -45,15 +76,23 @@ local function execute(code, description)
 end
 
 local function prepare(code, description)
+    if not check_description(description) then
+        log('error', 'bad description for prepare: %q', tostring(description))
+        return false
+    end
     local statement = db:prepare(code)
     if not statement then
         log('error', 'preparing %s %q: %s', description, code, db:errmsg())
-        return nil
+        return
     end
     return statement
 end
 
 local function bind(statement, description, ...)
+    if not check_description(description) then
+        log('error', 'bad description for bind: %q', tostring(description))
+        return false
+    end
     if statement:bind_values(...) ~= sql.OK then
         log('error', 'binding %s: %s %q', description, db:errmsg(), minetest.serialize({...}))
         return false
@@ -62,6 +101,10 @@ local function bind(statement, description, ...)
 end
 
 local function bind_and_step(statement, description, ...)
+    if not check_description(description) then
+        log('error', 'bad description for bind_and_step: %q', tostring(description))
+        return false
+    end
     if not bind(statement, description, ...) then return false end
     if statement:step() ~= sql.DONE then
         log('error', 'stepping %s: %s %q', description, db:errmsg(), minetest.serialize({...}))
@@ -72,6 +115,10 @@ local function bind_and_step(statement, description, ...)
 end
 
 local function finalize(statement, description)
+    if not check_description(description) then
+        log('error', 'bad description for finalize: %q', tostring(description))
+        return false
+    end
     if statement:finalize() ~= sql.OK then
         log('error', 'finalizing %s: %s', description, db:errmsg())
         return false
@@ -80,6 +127,10 @@ local function finalize(statement, description)
 end
 
 local function execute_bind_one(code, description, ...)
+    if not check_description(description) then
+        log('error', 'bad description for execute_bind_one: %q', tostring(description))
+        return false
+    end
     local statement = prepare(code, description)
     if not statement then return false end
     if not bind_and_step(statement, description, ...) then return false end
@@ -88,6 +139,10 @@ local function execute_bind_one(code, description, ...)
 end
 
 local function get_full_table(code, description, ...)
+    if not check_description(description) then
+        log('error', 'bad description for get_full_table: %q', tostring(description))
+        return false
+    end
     local statement = prepare(code, description)
     if not statement then return nil end
     if not bind(statement, description, ...) then return nil end
@@ -100,6 +155,10 @@ local function get_full_table(code, description, ...)
 end
 
 local function get_full_ntable(code, description, ...)
+    if not check_description(description) then
+        log('error', 'bad description for get_full_ntable: %q', tostring(description))
+        return false
+    end
     local statement = prepare(code, description)
     if not statement then return nil end
     if not bind(statement, description, ...) then return nil end
@@ -111,18 +170,46 @@ local function get_full_ntable(code, description, ...)
     return rows
 end
 
-local function sort_status_table(data)
+local function sort_status_table(status_table)
     local sortable = {}
-    for _, value in pairs(data) do table.insert(sortable, value) end
+    for _, value in pairs(status_table) do table.insert(sortable, value) end
     table.sort(sortable, function (a, b) return a.id < b.id end)
     return sortable
 end
 
-local function init_status_table(table_name, data)
+-- SCHEMA INITIALIZATION
+local function get_current_schema_version()
+    local code = [[
+        SELECT name
+          FROM sqlite_master
+         WHERE type == 'table'
+           AND name == ?;
+    ]]
+    local rows = get_full_ntable(code, 'does version table exist?', 'version')
+    if not rows or #rows > 1 then
+        log('error', 'error checking if version table exists')
+        return nil
+    end -- ERROR
+    if #rows == 0 then return 0 end -- if version table doesn't exist, assume DB is version 1
+    code = [[SELECT version FROM version]]
+    rows = get_full_ntable(code, 'get current version')
+    if not rows or #rows ~= 1 then
+        log('error', 'error querying version table')
+        return nil
+    end -- ERROR
+    return rows[1].version
+end
+
+local function set_current_schema_version(version)
+    local code = [[UPDATE version SET version = ?]]
+    execute_bind_one(code, 'set current schema version', version)
+end
+
+local function init_status_table(table_name, status_table)
     local status_sql = ('INSERT OR IGNORE INTO %s_status (id, name) VALUES (?, ?)'):format(table_name)
     local status_statement = prepare(status_sql, ('initialize %s_status'):format(table_name))
     if not status_statement then return false end
-    for _, status in ipairs(sort_status_table(data)) do
+    for _, status in ipairs(sort_status_table(status_table)) do
         if not bind_and_step(status_statement, 'insert status', status.id, status.name) then
             return false
         end
@@ -133,32 +220,47 @@ local function init_status_table(table_name, data)
     return true
 end
 
-local function init_db()
-    local schema = verbana.util.load_file(verbana.modpath .. '/schema.sql')
+local function intialize_schema()
+    verbana.log('action', 'initializing schema')
+    local schema = util.load_file(verbana.modpath .. '/schema.sql')
     if not schema then
-        error(('Could not find Verbana schema at %q'):format(verbana.modpath .. '/schema.sql'))
+        error(('[Verbana] Could not find Verbana schema at %q'):format(verbana.modpath .. '/schema.sql'))
     end
     if db:exec(schema) ~= sql.OK then
-        error(('Verbana failed to initialize the database: %s'):format(db:error_message()))
-    end
-    if not init_status_table('player', verbana.data.player_status) then
-        error('error initializing player_status: see server log')
-    end
-    if not init_status_table('ip', verbana.data.ip_status) then
-        error('error initializing ip_status: see server log')
-    end
-    if not init_status_table('asn', verbana.data.asn_status) then
-        error('error initializing asn_status: see server log')
-    end
-    local verbana_player_sql = 'INSERT OR IGNORE INTO player (name) VALUES (?)'
-    if not execute_bind_one(verbana_player_sql, 'verbana player', verbana.data.verbana_player) then
-        error('error initializing verbana internal player: see server log')
+        error(('[Verbana] failed to initialize the database: %s'):format(db:error_message()))
     end
 end
 
-init_db()
----- data API -----
-function verbana.data.reset_db()
+local function migrate_db(version)
+    verbana.log('action', 'migrating DB to version %s', version)
+    local filename = ('%s/migrations/%s.sql'):format(verbana.modpath, version)
+    local schema = util.load_file(filename)
+    if not schema then
+        error(('[Verbana] Could not find Verbana migration schema at %q'):format(filename))
+    end
+    if db:exec(schema) ~= sql.OK then
+        error(('[Verbana] failed to migrate the database to version %s: %s'):format(version, db:error_message()))
+    end
+end
+
+local function initialize_static_data()
+    verbana.log('action', 'initializing static data')
+    if not init_status_table('player', data.player_status) then
+        error('[Verbana] error initializing player_status: see server log')
+    end
+    if not init_status_table('ip', data.ip_status) then
+        error('[Verbana] error initializing ip_status: see server log')
+    end
+    if not init_status_table('asn', data.asn_status) then
+        error('[Verbana] error initializing asn_status: see server log')
+    end
+    local verbana_player_sql = 'INSERT OR IGNORE INTO player (name) VALUES (?)'
+    if not execute_bind_one(verbana_player_sql, 'verbana player', data.verbana_player) then
+        error('[Verbana] error initializing verbana internal player: see server log')
+    end
+end
+
+local function clean_db()
     local code = [[
         PRAGMA writable_schema = 1;
         DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger');
@@ -166,13 +268,45 @@ function verbana.data.reset_db()
         VACUUM;
         PRAGMA INTEGRITY_CHECK;
     ]]
-    if not execute(code, 'erase current DB') then
-        return false
-    end
-    init_db()
+    return execute(code, 'erase current DB')
 end
 
-function verbana.data.import_from_sban(filename)
+local function init_db()
+    local initialized = false
+    local current_version = get_current_schema_version()
+    if not current_version then
+        error('[Verbana] error getting current DB version; aborting.')
+    elseif current_version > data.version then
+        error('[Verbana] database version is more recent than code version; please upgrade code.')
+    elseif current_version == data.version then
+        return -- everything is up to date
+    elseif current_version == 0 then
+        -- wipe any pre-existing copies of the schema
+        if not clean_db() then
+            error('[Verbana] error wiping existing DB')
+        end
+        intialize_schema()
+        current_version = 1
+        initialized = true
+    end
+    for i = current_version + 1, data.version do
+        migrate_db(i)
+        set_current_schema_version(i)
+    end
+    initialize_static_data()
+
+    local sban_path = minetest.get_worldpath() .. '/sban.sqlite'
+    if util.file_exists(sban_path) then
+        log('action', 'automatically importing existing sban DB')
+        if not data.import_from_sban(sban_path) then
+            log('error', 'failed to import existing sban DB')
+        end
+    end
+end
+
+-- initialize DB after registering import_from_sban
+---- data API -----
+function data.import_from_sban(filename)
     -- apologies for the very long method
     local start = os.clock()
     if not execute('BEGIN TRANSACTION', 'sban import transaction') then
@@ -188,10 +322,14 @@ function verbana.data.import_from_sban(filename)
     local function _error(message, ...)
         if message then
             log('error', message, ...)
+        else
+            log('error', 'An error occurred while importing from sban')
         end
         execute('ROLLBACK', 'sban import rollback')
         if sban_db:close() ~= sql.OK then
-            log('error', 'closing sban DB %s', sban_db:errmsg())
+            log('error', 'Error closing sban DB %s', sban_db:errmsg())
+        else
+            log('error', 'closed sban DB')
         end
         return false
     end
@@ -236,8 +374,8 @@ function verbana.data.import_from_sban(filename)
     if not finalize(insert_assoc_statement, 'insert assoc') then return _error() end
     if not finalize(insert_log_statement, 'insert connection log') then return _error() end
     -- player status --
-    local default_player_status_id = verbana.data.player_status.default.id
-    local banned_player_status_id = verbana.data.player_status.banned.id
+    local default_player_status_id = data.player_status.default.id
+    local banned_player_status_id = data.player_status.banned.id
     local insert_player_status_sql = [[
         INSERT OR IGNORE
           INTO player_status_log (executor_id, player_id, status_id, timestamp, reason, expires)
@@ -245,13 +383,13 @@ function verbana.data.import_from_sban(filename)
     ]]
     local insert_player_status_statement = prepare(insert_player_status_sql, 'insert player status')
     if not insert_player_status_statement then return _error() end
---    local update_player_current_status_sql = [[
---        UPDATE player
---           SET current_status_id = ?
---         WHERE id = ?
---    ]]
---    local update_player_current_status_statement = prepare(update_player_current_status_sql, 'update player current status')
---    if not update_player_current_status_statement then return _error() end
+    local flag_player_sql = [[
+        UPDATE player
+           SET flagged = TRUE
+         WHERE id == ?
+    ]]
+    local flag_player_statement = prepare(flag_player_sql, 'flag player')
+    if not flag_player_statement then return _error() end
     local select_bans_sql = [[
         SELECT name, source, created, reason, expires, u_source, u_reason, u_date
           FROM bans
@@ -260,9 +398,10 @@ function verbana.data.import_from_sban(filename)
     for name, source, created, reason, expires, u_source, u_reason, u_date in sban_db:urows(select_bans_sql) do
         local player_id = player_id_by_name[name]
         local source_id = player_id_by_name[source]
+        if not bind_and_step(flag_player_statement, 'flag player', player_id) then return _error() end
         local unban_source_id
         if u_source and u_source == 'sban' then
-            unban_source_id = source_id
+            unban_source_id = source_id -- if a temp ban expired, mark it as unban by the original banner
         else
             unban_source_id = player_id_by_name[u_source]
         end
@@ -274,10 +413,9 @@ function verbana.data.import_from_sban(filename)
         if unban_source_id then
             if not bind_and_step(insert_player_status_statement, 'insert player status (unban)', unban_source_id, player_id, default_player_status_id, u_date,  u_reason, nil) then return _error() end
         end
---        bind_and_step(update_player_current_status_statement, 'update player current status', ?, player_id)
     end
     if not finalize(insert_player_status_statement, 'insert player status') then return _error() end
---    if not finalize(update_player_current_status_statement, 'update player current status') then return _error() end
+    if not finalize(flag_player_statement, 'flag player') then return _error() end
     -- SET LAST ACTION --
     local set_current_status_id_sql = [[
         UPDATE player
@@ -286,8 +424,16 @@ function verbana.data.import_from_sban(filename)
                                      WHERE player_status_log.player_id == player.id);
     ]]
     if not execute(set_current_status_id_sql, 'set last status') then return _error() end
+    -- SET LAST LOGIN --
+    local set_last_login_id_sql = [[
+        UPDATE player
+           SET last_login_id = (SELECT MAX(connection_log.id)
+                                  FROM connection_log
+                                 WHERE connection_log.player_id == player.id);
+    ]]
+    if not execute(set_last_login_id_sql, 'set last login') then return _error() end
     -- CLEANUP --
-    if not execute('COMMIT') then
+    if not execute('COMMIT', 'commit sban import') then
         if sban_db:close() ~= sql.OK then
             log('error', 'closing sban DB %s', sban_db:errmsg())
         end
@@ -299,11 +445,12 @@ function verbana.data.import_from_sban(filename)
     end
     log('action', 'imported from SBAN in %s seconds', os.clock() - start)
     return true
-end -- verbana.data.import_from_sban
+end -- data.import_from_sban
 
+init_db() -- initialize DB after registering import_from_sban
 
 local player_id_cache = {}
-function verbana.data.get_player_id(name, create_if_new)
+function data.get_player_id(name, create_if_new)
     local cached_id = player_id_cache[name]
     if cached_id then return cached_id end
     if create_if_new then
@@ -321,9 +468,19 @@ function verbana.data.get_player_id(name, create_if_new)
     return table[1][1]
 end
 
+function data.flag_player(player_id, flag)
+    local code = [[
+        UPDATE player
+           SET flagged = ?
+         WHERE player_id = ?
+    ]]
+    if not flag then flag = true end
+    return execute_bind_one(code, 'flag player', player_id)
+end
+
 local player_status_cache = {}
-function verbana.data.get_player_status(player_id, create_if_new)
-    player_id = verbana.data.get_master(player_id) or player_id
+function data.get_player_status(player_id, create_if_new)
+    player_id = data.get_master(player_id) or player_id
     local cached_status = player_status_cache[player_id]
     if cached_status then return cached_status, false end
     local code = [[
@@ -351,14 +508,14 @@ function verbana.data.get_player_status(player_id, create_if_new)
     elseif not create_if_new then
         return nil, nil
     end
-    if not verbana.data.set_player_status(player_id, verbana.data.verbana_player_id, verbana.data.player_status.default.id, 'creating initial player status') then
+    if not data.set_player_status(player_id, data.verbana_player_id, data.player_status.default.id, 'creating initial player status') then
         log('error', 'failed to set initial player status')
         return nil, true
     end
-    return verbana.data.get_player_status(player_id, false), true
+    return data.get_player_status(player_id, false), true
 end
-function verbana.data.set_player_status(player_id, executor_id, status_id, reason, expires, no_update_current)
-    player_id = verbana.data.get_master(player_id) or player_id
+function data.set_player_status(player_id, executor_id, status_id, reason, expires, no_update_current)
+    player_id = data.get_master(player_id) or player_id
     player_status_cache[player_id] = nil
     local code = [[
         INSERT INTO player_status_log (player_id, executor_id, status_id, reason, expires, timestamp)
@@ -370,16 +527,19 @@ function verbana.data.set_player_status(player_id, executor_id, status_id, reaso
         code = 'UPDATE player SET current_status_id = ? WHERE id = ?'
         if not execute_bind_one(code, 'update player last status id', last_id, player_id) then return false end
     end
+    if status_id ~= data.player_status.default.id then
+        return data.flag_player(player_id, true)
+    end
     return true
 end
 
-function verbana.data.register_ip(ipint)
+function data.register_ip(ipint)
     local code = 'INSERT OR IGNORE INTO ip (ip) VALUES (?)'
     return execute_bind_one(code, 'register ip', ipint)
 end
 
 local ip_status_cache = {}
-function verbana.data.get_ip_status(ipint, create_if_new)
+function data.get_ip_status(ipint, create_if_new)
     local cached_status = ip_status_cache[ipint]
     if cached_status then return cached_status end
     local code = [[
@@ -407,13 +567,13 @@ function verbana.data.get_ip_status(ipint, create_if_new)
     elseif not create_if_new then
         return nil
     end
-    if not verbana.data.set_ip_status(ipint, verbana.data.verbana_player_id, verbana.data.ip_status.default.id, 'creating initial ip status') then
+    if not data.set_ip_status(ipint, data.verbana_player_id, data.ip_status.default.id, 'creating initial ip status') then
         log('error', 'failed to set initial ip status')
         return nil
     end
-    return verbana.data.get_ip_status(ipint, false)
+    return data.get_ip_status(ipint, false)
 end
-function verbana.data.set_ip_status(ipint, executor_id, status_id, reason, expires)
+function data.set_ip_status(ipint, executor_id, status_id, reason, expires)
     ip_status_cache[ipint] = nil
     local code = [[
         INSERT INTO ip_status_log (ip, executor_id, status_id, reason, expires, timestamp)
@@ -426,13 +586,13 @@ function verbana.data.set_ip_status(ipint, executor_id, status_id, reason, expir
     return true
 end
 
-function verbana.data.register_asn(asn)
+function data.register_asn(asn)
     local code = 'INSERT OR IGNORE INTO asn (asn) VALUES (?)'
     return execute_bind_one(code, 'register asn', asn)
 end
 
 local asn_status_cache = {}
-function verbana.data.get_asn_status(asn, create_if_new)
+function data.get_asn_status(asn, create_if_new)
     local cached_status = asn_status_cache[asn]
     if cached_status then return cached_status end
     local code = [[
@@ -460,13 +620,13 @@ function verbana.data.get_asn_status(asn, create_if_new)
     elseif not create_if_new then
         return nil
     end
-    if not verbana.data.set_asn_status(asn, verbana.data.verbana_player_id, verbana.data.asn_status.default.id, 'creating initial asn status') then
+    if not data.set_asn_status(asn, data.verbana_player_id, data.asn_status.default.id, 'creating initial asn status') then
         log('error', 'failed to set initial asn status')
         return nil
     end
-    return verbana.data.get_asn_status(asn, false)
+    return data.get_asn_status(asn, false)
 end
-function verbana.data.set_asn_status(asn, executor_id, status_id, reason, expires)
+function data.set_asn_status(asn, executor_id, status_id, reason, expires)
     asn_status_cache[asn] = nil
     local code = [[
         INSERT INTO asn_status_log (asn, executor_id, status_id, reason, expires, timestamp)
@@ -479,17 +639,30 @@ function verbana.data.set_asn_status(asn, executor_id, status_id, reason, expire
     return true
 end
 
-function verbana.data.log(player_id, ipint, asn, success)
+function data.log(player_id, ipint, asn, success)
     local code = [[
         INSERT INTO connection_log (player_id, ip, asn, success, timestamp)
              VALUES                 (?,         ?,  ?,   ?,       ?)
     ]]
-    if not execute_bind_one(code, 'log connection', player_id, ipint, asn, success, os.time()) then return false end
+    if not execute_bind_one(code, 'log connection', player_id, ipint, asn, success, os.time()) then
+        return false
+    end
+    if success then
+        local last_login_id = db:last_insert_rowid()
+        code = [[
+            UPDATE player
+               SET last_login_id = ?
+             WHERE id = ?
+        ]]
+        if not execute_bind_one(code, 'set last login', last_login_id, player_id) then
+            return false
+        end
+    end
     return true
 end
 
-function verbana.data.assoc(player_id, ipint, asn)
-    player_id = verbana.data.get_master(player_id) or player_id
+function data.assoc(player_id, ipint, asn)
+    player_id = data.get_master(player_id) or player_id
     local insert_code = [[
         INSERT OR IGNORE INTO assoc (player_id, ip, asn, first_seen, last_seen)
                              VALUES (?,         ?,  ?,   ?,          ?)
@@ -505,21 +678,21 @@ function verbana.data.assoc(player_id, ipint, asn)
     if not execute_bind_one(update_code, 'update assoc', os.time(), player_id, ipint, asn) then return false end
     return true
 end
-function verbana.data.has_asn_assoc(player_id, asn)
-    player_id = verbana.data.get_master(player_id) or player_id
+function data.has_asn_assoc(player_id, asn)
+    player_id = data.get_master(player_id) or player_id
     local code = 'SELECT 1 FROM assoc WHERE player_id = ? AND asn == ? LIMIT 1'
     local table = get_full_table(code, 'find player asn assoc', player_id, asn)
     return #table == 1
 end
-function verbana.data.has_ip_assoc(player_id, ipint)
-    player_id = verbana.data.get_master(player_id) or player_id
+function data.has_ip_assoc(player_id, ipint)
+    player_id = data.get_master(player_id) or player_id
     local code = 'SELECT 1 FROM assoc WHERE player_id = ? AND ip == ? LIMIT 1'
     local table = get_full_table(code, 'find player asn assoc', player_id, ipint)
     return #table == 1
 end
 
-function verbana.data.get_player_status_log(player_id)
-    player_id = verbana.data.get_master(player_id) or player_id
+function data.get_player_status_log(player_id)
+    player_id = data.get_master(player_id) or player_id
     local code = [[
         SELECT executor.name executor_name
              , status.name   status_name
@@ -535,7 +708,7 @@ function verbana.data.get_player_status_log(player_id)
     ]]
     return get_full_ntable(code, 'player status log', player_id)
 end
-function verbana.data.get_ip_status_log(ipint)
+function data.get_ip_status_log(ipint)
     local code = [[
         SELECT executor.name executor_name
              , status.name   status_name
@@ -550,7 +723,7 @@ function verbana.data.get_ip_status_log(ipint)
     ]]
     return get_full_ntable(code, 'ip status log', ipint)
 end
-function verbana.data.get_asn_status_log(asn)
+function data.get_asn_status_log(asn)
     local code = [[
         SELECT executor.name executor_name
              , status.name   status_name
@@ -566,7 +739,7 @@ function verbana.data.get_asn_status_log(asn)
     return get_full_ntable(code, 'asn status log', asn)
 end
 
-function verbana.data.get_first_login(player_id)
+function data.get_first_login(player_id)
     local code = [[
         SELECT timestamp
           FROM connection_log
@@ -576,7 +749,7 @@ function verbana.data.get_first_login(player_id)
     ]]
     return get_full_ntable(code, 'first login', player_id)
 end
-function verbana.data.get_player_connection_log(player_id, limit)
+function data.get_player_connection_log(player_id, limit)
     local code = [[
         SELECT log.ip                   ipint
              , log.asn                  asn
@@ -598,9 +771,9 @@ function verbana.data.get_player_connection_log(player_id, limit)
         limit = 20
     end
     local t = get_full_ntable(code, 'player connection log', player_id, limit)
-    return verbana.util.table_reversed(t)
+    return util.table_reversed(t)
 end
-function verbana.data.get_ip_connection_log(ipint, limit)
+function data.get_ip_connection_log(ipint, limit)
     local code = [[
         SELECT player.name                 player_name
              , player.id                   player_id
@@ -622,9 +795,9 @@ function verbana.data.get_ip_connection_log(ipint, limit)
         limit = 20
     end
     local t = get_full_ntable(code, 'ip connection log', ipint, limit)
-    return verbana.util.table_reversed(t)
+    return util.table_reversed(t)
 end
-function verbana.data.get_asn_connection_log(asn, limit)
+function data.get_asn_connection_log(asn, limit)
     local code = [[
         SELECT player.name                 player_name
              , player.id                   player_id
@@ -646,10 +819,10 @@ function verbana.data.get_asn_connection_log(asn, limit)
         limit = 20
     end
     local t = get_full_ntable(code, 'asn connection log', asn, limit)
-    return verbana.util.table_reversed(t)
+    return util.table_reversed(t)
 end
 
-function verbana.data.get_network_connection_log(asn, limit)
+function data.get_network_connection_log(asn, limit)
     local code = [[
         SELECT player.name                 player_name
              , player.id                   player_id
@@ -671,11 +844,10 @@ function verbana.data.get_network_connection_log(asn, limit)
         limit = 20
     end
     local t = get_full_ntable(code, 'asn connection log', asn, limit)
-    return verbana.util.table_reversed(t)
+    return util.table_reversed(t)
 end
 
-
-function verbana.data.get_player_associations(player_id)
+function data.get_player_associations(player_id)
     local code = [[
         SELECT assoc.ip          ipint
              , assoc.asn         asn
@@ -692,7 +864,7 @@ function verbana.data.get_player_associations(player_id)
     ]]
     return get_full_ntable(code, 'player associations', player_id)
 end
-function verbana.data.get_ip_associations(ipint, from_time)
+function data.get_ip_associations(ipint, from_time)
     local code = [[
         SELECT
       DISTINCT player.name                 player_name
@@ -700,47 +872,55 @@ function verbana.data.get_ip_associations(ipint, from_time)
           FROM assoc
           JOIN player            ON player.id == assoc.player_id
      LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
-          JOIN connection_log    ON connection_log.timestamp >= ? AND connection_log.ip == assoc.ip AND connection_log.asn == assoc.asn
+          JOIN connection_log    ON connection_log.ip == assoc.ip
+                                AND connection_log.asn == assoc.asn
          WHERE assoc.ip == ?
+           AND connection_log.timestamp >= ?
       ORDER BY LOWER(player.name)
     ]]
-    return get_full_ntable(code, 'ip associations', from_time, ipint)
+    return get_full_ntable(code, 'ip associations', ipint, from_time)
 end
-function verbana.data.get_asn_associations(asn, from_time)
+function data.get_asn_associations(asn, from_time)
     local code = [[
         SELECT
       DISTINCT player.name                 player_name
              , player_status_log.status_id player_status_id
+             , connection_log.ip           ipint
+             , connection_log.asn          asn
           FROM assoc
-          JOIN player            ON player.id                == assoc.player_id
-     LEFT JOIN player_status_log ON player_status_log.id     == player.current_status_id
-          JOIN connection_log    ON connection_log.timestamp >= ?
-                                AND connection_log.ip == assoc.ip
-                                AND connection_log.asn == assoc.asn
+          JOIN connection_log USING (ip, asn)
+          JOIN player            ON player.id == assoc.player_id
+     LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
+     LEFT JOIN connection_log    ON connection_log.id == player.last_login_id
          WHERE assoc.asn == ?
+           AND connection_log.timestamp >= ?
+           AND player.flagged == TRUE
       ORDER BY LOWER(player.name)
     ]]
-    return get_full_ntable(code, 'asn associations', from_time, asn)
+    return get_full_ntable(code, 'asn associations', asn, from_time)
 end
 
-function verbana.data.get_player_cluster(player_id)
+function data.get_player_cluster(player_id)
     local code = [[
         SELECT
-      DISTINCT other.name         player_name
+      DISTINCT other.name                  player_name
              , player_status_log.status_id player_status_id
+             , connection_log.ip           ipint
+             , connection_log.asn          asn
           FROM player
           JOIN assoc player_assoc ON player_assoc.player_id == player.id
           JOIN assoc other_assoc  ON other_assoc.ip == player_assoc.ip
-                                 AND player_assoc.player_id != other_assoc.player_id
           JOIN player other       ON other.id == other_assoc.player_id
      LEFT JOIN player_status_log  ON player_status_log.id == other.current_status_id
+     LEFT JOIN connection_log     ON connection_log.id == player.last_login_id
          WHERE player.id == ?
+           AND player.id != other_assoc.player_id
       ORDER BY LOWER(other.name)
     ]]
     return get_full_ntable(code, 'player cluster', player_id)
 end
 
-function verbana.data.get_all_banned_players()
+function data.get_all_banned_players()
     local code = [[
         SELECT player.name                 player_name
              , player_status_log.status_id player_status_id
@@ -751,11 +931,11 @@ function verbana.data.get_all_banned_players()
          WHERE player_status_log.status_id == ?
     ]]
     return get_full_ntable(code, 'all banned',
-        verbana.data.player_status.banned
+        data.player_status.banned
     )
 end
 
-function verbana.data.fumble_about_for_an_ip(name, player_id)
+function data.fumble_about_for_an_ip(name, player_id)
     -- for some reason, get_player_ip is unreliable during register_on_newplayer
     local ipstr = minetest.get_player_ip(name)
     if not ipstr then
@@ -765,8 +945,8 @@ function verbana.data.fumble_about_for_an_ip(name, player_id)
         end
     end
     if not ipstr then
-        if not player_id then player_id = verbana.data.get_player_id(name) end
-        local connection_log = verbana.data.get_player_connection_log(player_id, 1)
+        if not player_id then player_id = data.get_player_id(name) end
+        local connection_log = data.get_player_connection_log(player_id, 1)
         if not connection_log or #connection_log ~= 1 then
             log('warning', 'player %s exists but has no connection log?', player_id)
         else
@@ -777,7 +957,7 @@ function verbana.data.fumble_about_for_an_ip(name, player_id)
     return ipstr
 end
 
-function verbana.data.get_ban_log(limit)
+function data.get_ban_log(limit)
     local code = [[
         SELECT player.name                 player_name
              , executor.name               executor_name
@@ -795,12 +975,12 @@ function verbana.data.get_ban_log(limit)
     ]]
     if not limit or type(limit) ~= 'number' or limit < 0 then limit = 20 end
     return get_full_ntable(code, 'ban log',
-        verbana.data.verbana_player_id,
+        data.verbana_player_id,
         limit
     )
 end
 
-function verbana.data.add_report(reporter_id, report)
+function data.add_report(reporter_id, report)
     local code = [[
         INSERT INTO report
                     (reporter_id, report, timestamp)
@@ -809,7 +989,7 @@ function verbana.data.add_report(reporter_id, report)
     return execute_bind_one(code, 'add report', reporter_id, report, os.time())
 end
 
-function verbana.data.get_reports(from_time)
+function data.get_reports(from_time)
     local code = [[
         SELECT player.name      reporter
              , report.report    report
@@ -821,7 +1001,7 @@ function verbana.data.get_reports(from_time)
     return get_full_ntable(code, 'get reports', from_time)
 end
 
-function verbana.data.get_asn_stats(asn)
+function data.get_asn_stats(asn)
     local code = [[
         SELECT COALESCE(player_status_log.status_id, ?)        player_status_id
              , COUNT(COALESCE(player_status_log.status_id, ?)) count
@@ -832,15 +1012,15 @@ function verbana.data.get_asn_stats(asn)
       ORDER BY COALESCE(player_status_log.status_id, ?)
     ]]
     return get_full_ntable(code, 'asn stats',
-        verbana.data.player_status.default.id,
-        verbana.data.player_status.default.id,
+        data.player_status.default.id,
+        data.player_status.default.id,
         asn,
-        verbana.data.player_status.default.id,
-        verbana.data.player_status.default.id
+        data.player_status.default.id,
+        data.player_status.default.id
     )
 end
 
-function verbana.data.get_master(player_id)
+function data.get_master(player_id)
     local code = [[
         SELECT master.id   id
              , master.name name
@@ -854,7 +1034,7 @@ function verbana.data.get_master(player_id)
     end
 end
 
-function verbana.data.set_master(player_id, master_id)
+function data.set_master(player_id, master_id)
     --[[
         case 1: master has no master
                 just set player's master
@@ -867,9 +1047,9 @@ function verbana.data.set_master(player_id, master_id)
         loops can not be created this way, because we've ensured that a "true" master can't have
         a master of its own.
     ]]
-    local master_master_id = verbana.data.get_master(master_id)
+    local master_master_id = data.get_master(master_id)
     if master_master_id == player_id then
-        return verbana.data.swap_master(player_id, master_id)
+        return data.swap_master(player_id, master_id)
     elseif master_master_id then
         master_id = master_master_id
     end
@@ -892,8 +1072,8 @@ function verbana.data.set_master(player_id, master_id)
     return true
 end
 
-function verbana.data.swap_master(player_id, master_id)
-    if verbana.data.get_master(player_id) ~= master_id then
+function data.swap_master(player_id, master_id)
+    if data.get_master(player_id) ~= master_id then
         return false, 'not player\'s master'
     end
     local code = [[
@@ -918,7 +1098,7 @@ function verbana.data.swap_master(player_id, master_id)
     return true
 end
 
-function verbana.data.unset_master(player_id)
+function data.unset_master(player_id)
     local code = [[
         UPDATE player
            SET master_id = NULL
@@ -927,7 +1107,7 @@ function verbana.data.unset_master(player_id)
     return execute_bind_one(code, 'unset master', player_id)
 end
 
-function verbana.data.get_alts(player_id)
+function data.get_alts(player_id)
     local code = [[
         SELECT master.name name
           FROM player master
@@ -938,7 +1118,7 @@ function verbana.data.get_alts(player_id)
           JOIN player alt    ON alt.master_id == master.id
          WHERE master.id == ?
     ]]
-    local master_id = verbana.data.get_master() or player_id
+    local master_id = data.get_master() or player_id
     local rows = get_full_ntable(code, 'get alts', master_id)
     if rows then
         local alts = {}
@@ -949,7 +1129,7 @@ function verbana.data.get_alts(player_id)
     end
 end
 
-function verbana.data.grep_player(pattern, limit)
+function data.grep_player(pattern, limit)
     local code = [[
         SELECT player.name                              name
              , COALESCE(player_status_log.status_id, ?) player_status_id
@@ -959,5 +1139,5 @@ function verbana.data.grep_player(pattern, limit)
       ORDER BY LOWER(player.name)
          LIMIT ?
     ]]
-    return get_full_ntable(code, 'grep player', verbana.data.player_status.default.id, pattern, limit)
+    return get_full_ntable(code, 'grep player', data.player_status.default.id, pattern, limit)
 end

@@ -19,6 +19,16 @@ function verbana.util.parse_time(text)
     return n * time_units[unit]
 end
 
+function verbana.util.file_exists(filename)
+   local handle = io.open(filename,"r")
+   if handle then
+       io.close(handle)
+       return true
+   else
+       return false
+   end
+end
+
 function verbana.util.load_file(filename)
     local file = io.open(filename, 'r')
     if not file then

@@ -60,7 +60,7 @@ register_chatcommand('sban_import', {
         if not filename or filename == '' then
             filename = minetest.get_worldpath() .. '/sban.sqlite'
         end
-        if not io.open(filename, 'r') then
+        if not util.file_exists(filename) then
             return false, ('Could not open file %q.'):format(filename)
         end
         chat_send_player(caller, 'Importing SBAN. This can take a while...')
@@ -834,7 +834,7 @@ register_chatcommand('asn_unblock', {
     end
 })
 ---------------- GET LOGS ---------------
-register_chatcommand('ban_record', {
+register_chatcommand('record', {
     description='shows the status log of a player',
     params='<player_name> [<number>]',
     privs={[mod_priv]=true},
@@ -865,6 +865,68 @@ register_chatcommand('ban_record', {
             starti = 1
         end
         for index = starti,#rows do
+            local row = rows[index]
+            local message = ('%s: %s set status to %s.'):format(
+                iso_date(row.timestamp),
+                row.executor_name,
+                row.status_name
+            )
+            local reason = row.reason
+            if reason and reason ~= '' then
+                message = ('%s Reason: %s'):format(message, reason)
+            end
+            local expires = row.expires
+            if expires then
+                message = ('%s Expires: %s'):format(message, iso_date(expires))
+            end
+            chat_send_player(caller, message)
+        end
+        return true
+    end
+})
+
+register_chatcommand('ban_record', {
+    description = 'shows relevant info for a player',
+    params = '<player_name>',
+    privs = { [mod_priv] = true },
+    func = function(caller, params)
+        local player_name = params:match('^([a-zA-Z0-9_-]+)$')
+        if not player_name or player_name:len() > 20 then
+            return false, 'Invalid argument'
+        end
+        local player_id = data.get_player_id(player_name)
+        if not player_id then
+            return false, 'Unknown player'
+        end
+        local ipint = data.fumble_about_for_an_ip(player_name, player_id)
+        local asn = lib_asn.lookup(ipint)
+
+        chat_send_player(caller, "Accounts associated by IP:")
+        local rows = data.get_player_cluster(player_id)
+        if not rows then return false, 'An error occurred (see server logs)' end
+        local clustered = {}
+        for _, row in ipairs(rows) do
+            local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
+            table.insert(clustered, minetest.colorize(color, row.player_name))
+        end
+        chat_send_player(caller, table.concat(clustered, ', '))
+
+        chat_send_player(caller, "Flagged accounts on the same ASN:")
+        rows = data.get_asn_associations(asn, '1y')
+        if not rows then return false, 'An error occurred (see server logs)' end
+        local assocs = {}
+        for _, row in ipairs(rows) do
+            local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
+            table.insert(assocs, minetest.colorize(color, row.player_name))
+        end
+        chat_send_player(caller, table.concat(clustered, ', '))
+
+        chat_send_player(caller, "Account status:")
+        rows = data.get_player_status_log(player_id)
+        if not rows then
+            return false, 'An error occurred (see server logs)'
+        end
+        for index = 1,#rows do
             local row = rows[index]
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
@@ -1061,7 +1123,7 @@ register_chatcommand('inspect', {
 
 register_chatcommand('ip_inspect', {
     description='list player accounts and statuses associated with an IP',
-    params='<IP> [<timespan>=1w]',
+    params='<IP> [<timespan>=1m]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local ipstr, timespan_str = params:match('^(%d+%.%d+%.%d+%.%d+)%s+(%w+)$')
@@ -1078,7 +1140,7 @@ register_chatcommand('ip_inspect', {
                 return false, 'Invalid timespan'
             end
         else
-            timespan = 60*60*24*7
+            timespan = parse_time('1m')
         end
         local ipint = lib_ip.ipstr_to_ipint(ipstr)
         local rows = data.get_ip_associations(ipint, timespan)
@@ -1102,7 +1164,7 @@ register_chatcommand('ip_inspect', {
 
 register_chatcommand('asn_inspect', {
     description='list player accounts and statuses associated with an ASN',
-    params='<ASN> [<timespan>=1w]',
+    params='<ASN> [<timespan>=1y]',
     privs={[mod_priv]=true},
     func=function(caller, params)
         local asn, timespan_str = params:match('^A?(%d+)%s+(%w+)$')
@@ -1119,7 +1181,7 @@ register_chatcommand('asn_inspect', {
                 return false, 'Invalid timespan'
             end
         else
-            timespan = 60*60*24*7
+            timespan = parse_time('1y')
         end
         asn = tonumber(asn)
         local description = lib_asn.get_description(asn)
@@ -1201,6 +1263,7 @@ register_chatcommand('cluster', {
         return true
     end
 })
+alias_chatcommand('/whois', 'cluster')
 --
 register_chatcommand('who2', {
     description='Show current connected players, statuses, and sources',
