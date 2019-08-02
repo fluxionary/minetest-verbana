@@ -386,7 +386,7 @@ function data.import_from_sban(filename)
     if not insert_player_status_statement then return _error() end
     local flag_player_sql = [[
         UPDATE player
-           SET flagged = TRUE
+           SET flagged = 1
          WHERE id == ?
     ]]
     local flag_player_statement = prepare(flag_player_sql, 'flag player')
@@ -897,7 +897,7 @@ function data.get_asn_associations(asn, from_time)
      LEFT JOIN connection_log last_log ON last_log.id == player.last_login_id
          WHERE assoc.asn == ?
            AND connection_log.timestamp >= ?
-           AND player.flagged == TRUE
+           AND player.flagged == 1
       ORDER BY LOWER(player.name)
     ]]
     return get_full_ntable(code, 'asn associations', asn, from_time)

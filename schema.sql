@@ -15,7 +15,7 @@ CREATE TABLE player (
   , master_id         INTEGER
   , current_status_id INTEGER
   , last_login_id     INTEGER
-  , flagged           BOOLEAN NOT NULL DEFAULT FALSE
+  , flagged           BOOLEAN NOT NULL DEFAULT 0
   , FOREIGN KEY (master_id)         REFERENCES player(id)
   , FOREIGN KEY (current_status_id) REFERENCES player_status_log(id)
   , FOREIGN KEY (last_login_id)     REFERENCES connection_log(id)
