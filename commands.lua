@@ -1,21 +1,23 @@
-verbana.commands = {}
+verbana.commands       = {}
 
-local data = verbana.data
-local lib_asn = verbana.lib_asn
-local lib_ip = verbana.lib_ip
-local log = verbana.log
-local settings = verbana.settings
-local util = verbana.util
+local data             = verbana.data
+local lib_asn          = verbana.lib_asn
+local lib_ip           = verbana.lib_ip
+local log              = verbana.log
+local settings         = verbana.settings
+local util             = verbana.util
 
-local mod_priv = verbana.privs.moderator
-local admin_priv = verbana.privs.admin
-local debug_mode = settings.debug_mode
+local mod_priv         = verbana.privs.moderator
+local admin_priv       = verbana.privs.admin
+local debug_mode       = settings.debug_mode
 
-local parse_time = util.parse_time
-local safe = util.safe
+local parse_timespan   = util.parse_timespan
+local safe             = util.safe
 local safe_kick_player = util.safe_kick_player
-local table_contains = util.table_contains
-local iso_date = util.iso_date
+local table_contains   = util.table_contains
+local iso_date         = util.iso_date
+
+local colorize         = minetest.colorize
 
 local function chat_send_player(name, message, ...)
     message = message:format(...)
@@ -53,7 +55,7 @@ local function alias_chatcommand(name, existing_name)
 end
 
 register_chatcommand('sban_import', {
-    description='Import records from sban',
+    description='Import records from sban into verbana',
     params='[<filename>]',
     privs={[admin_priv]=true},
     func=function (caller, filename)
@@ -284,7 +286,7 @@ override_chatcommand('ban', {
         local expires
         if reason then
             local first = reason:match('^(%S+)')
-            timespan = parse_time(first)
+            timespan = parse_timespan(first)
             if timespan then
                 reason = reason:sub(first:len() + 2)
                 expires = os.time() + timespan
@@ -617,7 +619,7 @@ register_chatcommand('ip_block', {
         local expires
         if reason then
             local first = reason:match('^(%S+)')
-            timespan = parse_time(first)
+            timespan = parse_timespan(first)
             if timespan then
                 reason = reason:sub(first:len() + 2)
                 expires = os.time() + timespan
@@ -769,7 +771,7 @@ register_chatcommand('asn_block', {
         local expires
         if reason then
             local first = reason:match('^(%S+)')
-            timespan = parse_time(first)
+            timespan = parse_timespan(first)
             if timespan then
                 reason = reason:sub(first:len() + 2)
                 expires = os.time() + timespan
@@ -834,7 +836,7 @@ register_chatcommand('asn_unblock', {
     end
 })
 ---------------- GET LOGS ---------------
-register_chatcommand('record', {
+register_chatcommand('status', {
     description='shows the status log of a player',
     params='<player_name> [<number>]',
     privs={[mod_priv]=true},
@@ -866,10 +868,12 @@ register_chatcommand('record', {
         end
         for index = starti,#rows do
             local row = rows[index]
+            local status_name = data.player_status_name[row.status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.status_id] or data.player_status.default.color
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                row.status_name
+                colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -898,8 +902,9 @@ register_chatcommand('ban_record', {
         if not player_id then
             return false, 'Unknown player'
         end
-        local ipint = data.fumble_about_for_an_ip(player_name, player_id)
-        local asn = lib_asn.lookup(ipint)
+        local ipstr = data.fumble_about_for_an_ip(player_name, player_id)
+        local ipint = lib_ip.ipstr_to_ipint(ipstr)
+        local asn, asn_description = lib_asn.lookup(ipint)
 
         chat_send_player(caller, "Accounts associated by IP:")
         local rows = data.get_player_cluster(player_id)
@@ -907,17 +912,17 @@ register_chatcommand('ban_record', {
         local clustered = {}
         for _, row in ipairs(rows) do
             local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
-            table.insert(clustered, minetest.colorize(color, row.player_name))
+            table.insert(clustered, colorize(color, row.player_name))
         end
         chat_send_player(caller, table.concat(clustered, ', '))
 
-        chat_send_player(caller, "Flagged accounts on the same ASN:")
-        rows = data.get_asn_associations(asn, os.time() - parse_time('1y'))
+        chat_send_player(caller, "Flagged accounts on A%s (%s):", asn, asn_description)
+        rows = data.get_asn_associations(asn, os.time() - parse_timespan('1y'))
         if not rows then return false, 'An error occurred (see server logs)' end
         local assocs = {}
         for _, row in ipairs(rows) do
             local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
-            table.insert(assocs, minetest.colorize(color, row.player_name))
+            table.insert(assocs, colorize(color, row.player_name))
         end
         chat_send_player(caller, table.concat(assocs, ', '))
 
@@ -928,10 +933,12 @@ register_chatcommand('ban_record', {
         end
         for index = 1,#rows do
             local row = rows[index]
+            local status_name = data.player_status_name[row.status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.status_id] or data.player_status.default.color
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                row.status_name
+                colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -947,7 +954,7 @@ register_chatcommand('ban_record', {
     end
 })
 
-register_chatcommand('ip_record', {
+register_chatcommand('ip_status', {
     description='shows the status log of an IP',
     params='<IP> [<number>]',
     privs={[mod_priv]=true},
@@ -976,10 +983,12 @@ register_chatcommand('ip_record', {
         end
         for index = starti,#rows do
             local row = rows[index]
+            local status_name = data.ip_status_name[row.status_id] or data.ip_status.default.name
+            local status_color = data.ip_status_color[row.status_id] or data.ip_status.default.color
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                row.status_name
+                colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -995,7 +1004,7 @@ register_chatcommand('ip_record', {
     end
 })
 
-register_chatcommand('asn_record', {
+register_chatcommand('asn_status', {
     description='shows the status log of an ASN',
     params='<ASN> [<number>]',
     privs={[mod_priv]=true},
@@ -1024,10 +1033,12 @@ register_chatcommand('asn_record', {
         end
         for index = starti,#rows do
             local row = rows[index]
+            local status_name = data.asn_status_name[row.status_id] or data.asn_status.default.name
+            local status_color = data.asn_status_color[row.status_id] or data.asn_status.default.color
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                row.status_name
+                colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -1069,14 +1080,19 @@ register_chatcommand('logins', {
             return true, 'No records found.'
         end
         for _, row in ipairs(rows) do
+            local ip_status_name = data.ip_status_name[row.ip_status_id] or data.ip_status.default.name
+            local ip_status_color = data.ip_status_color[row.ip_status_id] or data.ip_status.default.color
+            local asn_status_name = data.asn_status_name[row.asn_status_id] or data.asn_status.default.name
+            local asn_status_color = data.asn_status_color[row.asn_status_id] or data.asn_status.default.color
+            local asn_description = lib_asn.get_description(row.asn)
             local message = ('%s:%s from %s<%s> A%s<%s> (%s)'):format(
                 iso_date(row.timestamp),
-                (rows.success and ' failed!') or '',
-                lib_ip.ipint_to_ipstr(row.ipint),
-                data.ip_status_name[row.ip_status_id] or data.ip_status.default.name,
-                row.asn,
-                data.asn_status_name[row.asn_status_id] or data.asn_status.default.name,
-                lib_asn.get_description(row.asn)
+                (rows.success and '') or ' failed!',
+                colorize(ip_status_color, lib_ip.ipint_to_ipstr(row.ipint)),
+                colorize(ip_status_color, ip_status_name),
+                colorize(asn_status_color, row.asn),
+                colorize(asn_status_color, asn_status_name),
+                colorize(asn_status_color, asn_description)
             )
             chat_send_player(caller, message)
         end
@@ -1108,12 +1124,16 @@ register_chatcommand('inspect', {
         for _, row in ipairs(rows) do
             local ipstr = lib_ip.ipint_to_ipstr(row.ipint)
             local asn_description = lib_asn.get_description(row.asn)
+            local ip_status_name = data.ip_status_name[row.ip_status_id] or data.ip_status.default.name
+            local ip_status_color = data.ip_status_color[row.ip_status_id] or data.ip_status.default.color
+            local asn_status_name = data.asn_status_name[row.asn_status_id] or data.asn_status.default.name
+            local asn_status_color = data.asn_status_color[row.asn_status_id] or data.asn_status.default.color
             local message = ('%s<%s> A%s (%s) <%s>'):format(
-                ipstr,
-                data.ip_status_name[row.ip_status_id] or data.ip_status.default.name,
-                row.asn,
-                asn_description,
-                data.asn_status_name[row.asn_status_id] or data.asn_status.default.name
+                colorize(ip_status_color, ipstr),
+                colorize(ip_status_color, ip_status_name),
+                colorize(asn_status_color, row.asn),
+                colorize(asn_status_color, asn_description),
+                colorize(asn_status_color, asn_status_name)
             )
             chat_send_player(caller, message)
         end
@@ -1135,12 +1155,12 @@ register_chatcommand('ip_inspect', {
         end
         local timespan
         if timespan_str then
-            timespan = parse_time(timespan_str)
+            timespan = parse_timespan(timespan_str)
             if not timespan then
                 return false, 'Invalid timespan'
             end
         else
-            timespan = parse_time('1m')
+            timespan = parse_timespan('1m')
         end
         local ipint = lib_ip.ipstr_to_ipint(ipstr)
         local rows = data.get_ip_associations(ipint, timespan)
@@ -1152,9 +1172,11 @@ register_chatcommand('ip_inspect', {
         end
         chat_send_player(caller, ('Records for %s'):format(ipstr))
         for _, row in ipairs(rows) do
+            local status_name = data.player_status_name[row.player_status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
             local message = ('% 20s: %s'):format(
                 row.player_name,
-                data.player_status_name[row.player_status_id] or data.player_status.default.name
+                colorize(status_color, status_name)
             )
             chat_send_player(caller, message)
         end
@@ -1163,7 +1185,7 @@ register_chatcommand('ip_inspect', {
 })
 
 register_chatcommand('asn_inspect', {
-    description='list player accounts and statuses associated with an ASN',
+    description='list *FLAGGED* player accounts and statuses associated with an ASN',
     params='<ASN> [<timespan>=1y]',
     privs={[mod_priv]=true},
     func=function(caller, params)
@@ -1176,12 +1198,12 @@ register_chatcommand('asn_inspect', {
         end
         local timespan
         if timespan_str then
-            timespan = parse_time(timespan_str)
+            timespan = parse_timespan(timespan_str)
             if not timespan then
                 return false, 'Invalid timespan'
             end
         else
-            timespan = parse_time('1y')
+            timespan = parse_timespan('1y')
         end
         asn = tonumber(asn)
         local description = lib_asn.get_description(asn)
@@ -1195,9 +1217,12 @@ register_chatcommand('asn_inspect', {
         end
         chat_send_player(caller, ('Records for A%s : %s'):format(asn, description))
         for _, row in ipairs(rows) do
-            local message = ('% 20s: %s'):format(
+            local status_name = data.player_status_name[row.player_status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
+            local message = ('% 20s: %s (last IP: %s)'):format(
                 row.player_name,
-                data.player_status_name[row.player_status_id] or data.player_status.default.name
+                colorize(status_color, status_name),
+                lib_ip.ipint_to_ipstr(row.ipint)
             )
             chat_send_player(caller, message)
         end
@@ -1224,8 +1249,10 @@ register_chatcommand('asn_stats', {
         end
         chat_send_player(caller, ('Statistics for %s:'):format(asn_description))
         for _, row in ipairs(rows) do
+            local status_name = data.player_status_name[row.player_status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
             chat_send_player(caller, ('%s %s'):format(
-                data.player_status_name[row.player_status_id] or data.player_status.default.name,
+                colorize(status_color, status_name),
                 row.count
             ))
         end
@@ -1254,9 +1281,11 @@ register_chatcommand('cluster', {
             return true, 'No records found.'
         end
         for _, row in ipairs(rows) do
+            local status_name = data.player_status_name[row.player_status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
             local message = ('% 20s: %s'):format(
                 row.player_name,
-                data.player_status_name[row.player_status_id] or data.player_status.default.name
+                colorize(status_color, status_name)
             )
             chat_send_player(caller, message)
         end
@@ -1277,22 +1306,25 @@ register_chatcommand('who2', {
         for _, name in ipairs(names) do
             local player_id = data.get_player_id(name)
             local player_status = data.get_player_status(player_id)
+            local player_status_color = data.player_status_color[player_status.id]
 
             local ipstr = verbana.data.fumble_about_for_an_ip(name, player_id)
             local ipint = lib_ip.ipstr_to_ipint(ipstr)
             local ip_status = data.get_ip_status(ipint)
+            local ip_status_color = data.ip_status_color[ip_status.id]
 
             local asn, asn_description = lib_asn.lookup(ipint)
             local asn_status = data.get_asn_status(asn)
+            local asn_status_color = data.asn_status_color[asn_status.id]
 
-            local message = ('% 20s (%s) %s (%s) A%s (%s) %s'):format(
-                name,
-                player_status.name,
-                ipstr,
-                ip_status.name,
-                asn,
-                asn_status.name,
-                asn_description
+            local message = ('% 20s<%s> %s<%s> A%s<%s> (%s)'):format(
+                colorize(player_status_color, name),
+                colorize(player_status_color, player_status.name),
+                colorize(ip_status_color, ipstr),
+                colorize(ip_status_color, ip_status.name),
+                colorize(asn_status_color, asn),
+                colorize(asn_status_color, asn_status.name),
+                colorize(asn_status_color, asn_description)
             )
             chat_send_player(caller, message)
         end
@@ -1324,10 +1356,12 @@ register_chatcommand('bans', {
             return true, 'No records found.'
         end
         for _, row in ipairs(rows) do
+            local status_name = data.player_status_name[row.status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.status_id] or data.player_status.default.color
             local message = ('%s: %s %s %s'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                row.status_name,
+                colorize(status_color, status_name),
                 row.player_name
             )
             if row.expires then
@@ -1382,7 +1416,7 @@ register_chatcommand('reports', {
     func=function(caller, timespan_str)
         local timespan
         if timespan_str ~= '' then
-            timespan = parse_time(timespan_str)
+            timespan = parse_timespan(timespan_str)
             if not timespan then
                 return false, 'Invalid timespan'
             end
@@ -1463,7 +1497,7 @@ register_chatcommand('master', {
     end
 })
 
-register_chatcommand('master_rm', {
+register_chatcommand('unmaster', {
     description='Remove the master from an alt account',
     params='<player_name>',
     privs={[mod_priv]=true},
@@ -1487,6 +1521,33 @@ register_chatcommand('master_rm', {
     end
 })
 
+register_chatcommand('alts', {
+    description = 'List alts of a player',
+    params      = '<player_name>',
+    privs       = { [mod_priv] = true },
+    func        = function(caller, player_name)
+        local alt_id = data.get_player_id(player_name)
+        if not alt_id then
+            return false, 'Unknown or invalid player name'
+        end
+        local master_id, master_name = data.get_master(alt_id)
+        if not master_id then
+            master_id = alt_id
+            master_name = player_name
+        end
+        local alts = data.get_alts(master_id)
+        if not alts then
+            return false, 'An error occured (see server logs)'
+        end
+        if #alts == 0 then
+            return true, ('%s has no alts'):format(master_name)
+        else
+            chat_send_player(caller, 'Master account: %s', master_name)
+            chat_send_player(caller, 'Alts: %s', table.concat(alts, ', '))
+        end
+    end
+})
+
 register_chatcommand('pgrep', {
     description='Search for players by name, using a SQLite GLOB expression (e.g. "*foo*")',
     params='<pattern> [<limit>=20]',
@@ -1507,11 +1568,37 @@ register_chatcommand('pgrep', {
             return true, 'No matches'
         end
         for _, row in ipairs(rows) do
-            chat_send_player(caller, '%s %s',
+            local status_name = data.player_status_name[row.player_status_id] or data.player_status.default.name
+            local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
+            local ipstr = (row.ipint and lib_ip.ipint_to_ipstr(row.ipint)) or ''
+            local asn = row.asn or ''
+            local asn_description = (row.asn and lib_asn.get_description(row.asn)) or ''
+            chat_send_player(caller, '%s %s %s %s (%s)',
                 row.name,
-                data.player_status_name[row.player_status_id] or data.player_status.default.name
+                colorize(status_color, status_name),
+                ipstr,
+                asn,
+                asn_description
             )
         end
         return true
     end
 })
+
+register_chatcommand('unflag', {
+    description='remove a flag from a player',
+    params='<player_name>',
+    privs={[mod_priv]=true},
+    func=function(caller, player_name)
+        local player_id = data.get_player_id(player_name)
+        if not player_id then
+            return false, 'Unknown player'
+        end
+        if data.flag_player(player_id, false) then
+            return true, ('Unflagged %s'):format(player_name)
+        else
+            return false, 'Error (see server log)'
+        end
+    end
+})
+

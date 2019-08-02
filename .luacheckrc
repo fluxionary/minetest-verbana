@@ -1,14 +1,15 @@
 max_line_length = false
 
 read_globals = {
-  "minetest",
   "irc",
   "irc2",
   "vector",
+  "os",
+  "sqlite3",
 }
 
 globals = {
   "verbana",
-  "sqlite3",
+  "minetest",
 }
 

@@ -8,7 +8,7 @@ local time_units = {
     y = 60 * 60 * 24 * 365,
 }
 
-function verbana.util.parse_time(text)
+function verbana.util.parse_timespan(text)
     if type(text) ~= 'string' then
         return nil
     end

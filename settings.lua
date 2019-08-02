@@ -61,7 +61,7 @@ verbana.settings.unverified_spawn_pos = minetest.string_to_pos(get_setting('verb
 
 verbana.settings.universal_verification = settings:get_bool('verbana.universal_verification', false)
 verbana.settings.jail_bounds = get_jail_bounds()
-verbana.settings.jail_check_period = get_setting('verbana.jail_check_period')
+verbana.settings.jail_check_period = tonumber(get_setting('verbana.jail_check_period'))
 
 local debug_is_default -- we revert to debug mode if verification or sban is enabled
 if ((

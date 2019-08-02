@@ -100,8 +100,6 @@ end
 
 local function find(ipint)
     -- binary search
-    -- TODO we could possibly weight the "middle" based in where ipint falls in [0,2**32).
-    -- TODO see e.g. https://en.wikipedia.org/wiki/Interpolation_search
     local t = verbana.lib_asn.network
     local low = 1
     local high = #t
@@ -138,5 +136,9 @@ function verbana.lib_asn.lookup(ipstr)
 end
 
 function verbana.lib_asn.get_description(asn)
-    return verbana.lib_asn.description[asn] or verbana.lib_asn.invalid_asn_description
+    if asn == 0 then
+        return 'Not part of a known ASN'
+    else
+        return verbana.lib_asn.description[asn] or verbana.lib_asn.invalid_asn_description
+    end
 end

@@ -1,21 +1,21 @@
-local data = verbana.data
-local lib_asn = verbana.lib_asn
-local lib_ip = verbana.lib_ip
-local log = verbana.log
-local privs = verbana.privs
-local settings = verbana.settings
-local util = verbana.util
+local data                    = verbana.data
+local lib_asn                 = verbana.lib_asn
+local lib_ip                  = verbana.lib_ip
+local log                     = verbana.log
+local privs                   = verbana.privs
+local settings                = verbana.settings
+local util                    = verbana.util
 
-local safe = util.safe
-local iso_date = util.iso_date
+local safe                    = util.safe
+local iso_date                = util.iso_date
 
-local spawn_pos = settings.spawn_pos
-local unverified_spawn_pos = settings.unverified_spawn_pos
-local verification_jail = settings.verification_jail
-local verification_jail_period = settings.verification_jail_period
-local USING_VERIFICATION_JAIL = verification_jail and verification_jail_period
+local spawn_pos               = settings.spawn_pos
+local unverified_spawn_pos    = settings.unverified_spawn_pos
+local jail_bounds             = settings.jail_bounds
+local jail_check_period       = settings.jail_check_period
+local USING_VERIFICATION_JAIL = jail_bounds and jail_check_period
 
-local check_player_privs = minetest.check_player_privs
+local check_player_privs      = minetest.check_player_privs
 
 local function should_rejail(player, player_status)
     if player_status.id ~= data.player_status.unverified.id then
@@ -23,9 +23,9 @@ local function should_rejail(player, player_status)
     end
     local pos = player:get_pos()
     return not (
-        verification_jail[1].x <= pos.x and pos.x <= verification_jail[2].x and
-        verification_jail[1].y <= pos.y and pos.y <= verification_jail[2].y and
-        verification_jail[1].z <= pos.z and pos.z <= verification_jail[2].z
+        jail_bounds[1].x - 1 <= pos.x and pos.x <= jail_bounds[2].x + 1 and
+        jail_bounds[1].y - 1 <= pos.y and pos.y <= jail_bounds[2].y + 1 and
+        jail_bounds[1].z - 1 <= pos.z and pos.z <= jail_bounds[2].z + 1
     )
 end
 
@@ -38,18 +38,19 @@ local function should_unjail(player, player_status)
 
     local pos = player:get_pos()
     return (
-        verification_jail[1].x <= pos.x and pos.x <= verification_jail[2].x and
-        verification_jail[1].y <= pos.y and pos.y <= verification_jail[2].y and
-        verification_jail[1].z <= pos.z and pos.z <= verification_jail[2].z
+        jail_bounds[1].x - 1 <= pos.x and pos.x <= jail_bounds[2].x + 1 and
+        jail_bounds[1].y - 1 <= pos.y and pos.y <= jail_bounds[2].y + 1 and
+        jail_bounds[1].z - 1 <= pos.z and pos.z <= jail_bounds[2].z + 1
     )
 end
 
 
 if USING_VERIFICATION_JAIL then
     local timer = 0
+    log('action','initializing rejail globalstep')
     minetest.register_globalstep(function(dtime)
         timer = timer + dtime;
-        if timer < verification_jail_period then
+        if timer < jail_check_period then
             return
         end
         timer = 0
@@ -76,13 +77,13 @@ end
 
 minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     -- return a string w/ the reason for refusal; otherwise return nothing
-    log('action', 'prejoin: %s %s', name, ipstr)
     local ipint = lib_ip.ipstr_to_ipint(ipstr)
     local asn, asn_description = lib_asn.lookup(ipint)
+    log('action', '[prejoin] %s %s A%s (%s)', name, ipstr, asn, asn_description)
 
     local player_id = data.get_player_id(name, true) -- will create one if none exists
     if not player_id then
-        log('error', 'could not retrieve or create id for player %s', name)
+        log('error', '[prejoin] could not retrieve or create id for player %s', name)
         return  -- let them in... it's not their fault :\
     end
 
@@ -95,14 +96,17 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     -- check and clear temporary statuses
     local now = os.time()
     if player_status.id == data.player_status.banned.id and player_status.expires and now >= player_status.expires then
+        log('action', '[prejoin] expiring temp ban of %s', name)
         data.set_player_status(player_id, player_status.executor_id, data.player_status.suspicious.id, 'temp ban expired')
         player_status = data.get_player_status(player_id) -- refresh player status
     end
     if ip_status.id == data.ip_status.blocked.id and ip_status.expires and now >= ip_status.expires then
+        log('action', '[prejoin] expiring temp block of %s', ipstr)
         data.set_ip_status(ipint, ip_status.executor_id, data.ip_status.suspicious.id, 'temp block expired')
         ip_status = data.get_ip_status(ipint) -- refresh ip status
     end
     if asn_status.id == data.asn_status.blocked.id and asn_status.expires and now >= asn_status.expires then
+        log('action', '[prejoin] expiring temp block of A%s', asn)
         data.set_asn_status(asn, asn_status.executor_id, data.asn_status.suspicious.id, 'temp block expired')
         asn_status = data.get_asn_status(asn) -- refresh asn status
     end
@@ -113,12 +117,16 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
 
     if player_status.id == data.player_status.whitelisted.id then
         -- if the player is whitelisted, let them in.
+        log('action', '[prejoin] %s is whitelisted', name)
     elseif settings.whitelisted_privs and check_player_privs(name, settings.whitelisted_privs) then
         -- if the player has a whitelisted priv, let them in.
+        log('action', '[prejoin] %s whitelisted by privs', name)
     elseif ip_status.id == data.ip_status.trusted.id then
         -- let them in
+        log('action', '[prejoin] %s is trusted', ipstr)
     elseif ip_status.id == data.ip_status.suspicious.id then
         suspicious = true
+        log('action', '[prejoin] %s is suspicious', ipstr)
     elseif player_status.id == data.player_status.banned.id then
         local reason = player_status.reason
         if player_status.expires then
@@ -153,6 +161,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
         end
     elseif asn_status.id == data.asn_status.suspicious.id then
         suspicious = true
+        log('action', '[prejoin] A%s is suspicious', asn)
     elseif asn_status.id == data.asn_status.blocked.id then
         local reason = asn_status.reason
         if asn_status.expires then
@@ -233,8 +242,9 @@ minetest.register_on_newplayer(safe(function(player)
 
         need_to_verify = (
             settings.universal_verification or
-            ip_status.name == 'suspicious' or
-            (asn_status.name == 'suspicious' and ip_status.name ~= 'trusted')
+            ip_status.id == data.ip_status.suspicious.id or
+            (asn_status.id == data.asn_status.suspicious.id and
+             ip_status.id ~= data.ip_status.trusted.id)
         )
     end
 
@@ -266,14 +276,22 @@ minetest.register_on_joinplayer(safe(function(player)
     local player_status = data.get_player_status(player_id)
     local is_unverified = player_status.id == data.player_status.unverified.id
     local ipstr = data.fumble_about_for_an_ip(name)
-    if ipstr then
-        local ipint = lib_ip.ipstr_to_ipint(ipstr)
-        local asn, asn_description = lib_asn.lookup(ipint)
-        if is_unverified then
+    if is_unverified then
+        if ipstr then
+            local ipint = lib_ip.ipstr_to_ipint(ipstr)
+            local asn, asn_description = lib_asn.lookup(ipint)
             verbana.chat.tell_mods(('*** Player %s from A%s (%s) is unverified.'):format(name, asn, asn_description))
+        else
+            verbana.chat.tell_mods(('*** Player %s is unverified.'):format(name))
         end
-    else
-        verbana.chat.tell_mods(('*** Player %s is unverified.'):format(name))
+    elseif player_status.id == data.player_status.suspicious.id then
+        if ipstr then
+            local ipint = lib_ip.ipstr_to_ipint(ipstr)
+            local asn, asn_description = lib_asn.lookup(ipint)
+            verbana.chat.tell_mods(('*** Player %s from A%s (%s) is suspicious.'):format(name, asn, asn_description))
+        else
+            verbana.chat.tell_mods(('*** Player %s is suspicious.'):format(name))
+        end
     end
 
     if USING_VERIFICATION_JAIL then

@@ -309,6 +309,7 @@ end
 function data.import_from_sban(filename)
     -- apologies for the very long method
     local start = os.clock()
+    local now = os.time()
     if not execute('BEGIN TRANSACTION', 'sban import transaction') then
         return false
     end
@@ -410,7 +411,7 @@ function data.import_from_sban(filename)
         -- BAN
         if not bind_and_step(insert_player_status_statement,     'insert player status (ban)',   source_id,       player_id, status_id,                created, reason,   expires) then return _error() end
         -- UNBAN
-        if unban_source_id then
+        if unban_source_id and (not expires or expires <= now) then
             if not bind_and_step(insert_player_status_statement, 'insert player status (unban)', unban_source_id, player_id, default_player_status_id, u_date,  u_reason, nil) then return _error() end
         end
     end
@@ -472,10 +473,10 @@ function data.flag_player(player_id, flag)
     local code = [[
         UPDATE player
            SET flagged = ?
-         WHERE player_id = ?
+         WHERE id = ?
     ]]
     if not flag then flag = true end
-    return execute_bind_one(code, 'flag player', player_id)
+    return execute_bind_one(code, 'flag player', flag, player_id)
 end
 
 local player_status_cache = {}
@@ -484,13 +485,14 @@ function data.get_player_status(player_id, create_if_new)
     local cached_status = player_status_cache[player_id]
     if cached_status then return cached_status, false end
     local code = [[
-        SELECT executor.id   executor_id
-             , executor.name executor_name
-             , status.id     id
-             , status.name   name
-             , log.timestamp timestamp
-             , log.reason    reason
-             , log.expires   expires
+        SELECT executor.id    executor_id
+             , executor.name  executor_name
+             , status.id      id
+             , status.name    name
+             , log.timestamp  timestamp
+             , log.reason     reason
+             , log.expires    expires
+             , player.flagged flagged
           FROM player
           JOIN player_status_log log      ON player.current_status_id == log.id
           JOIN player_status     status   ON log.status_id == status.id
@@ -521,13 +523,14 @@ function data.set_player_status(player_id, executor_id, status_id, reason, expir
         INSERT INTO player_status_log (player_id, executor_id, status_id, reason, expires, timestamp)
              VALUES                   (?,         ?,           ?,         ?,      ?,       ?)
     ]]
-    if not execute_bind_one(code, 'set player status', player_id, executor_id, status_id, reason, expires, os.time()) then return false end
+    local now = os.time()
+    if not execute_bind_one(code, 'set player status', player_id, executor_id, status_id, reason, expires, now) then return false end
     if not no_update_current then
         local last_id = db:last_insert_rowid()
         code = 'UPDATE player SET current_status_id = ? WHERE id = ?'
         if not execute_bind_one(code, 'update player last status id', last_id, player_id) then return false end
     end
-    if status_id ~= data.player_status.default.id then
+    if status_id ~= data.player_status.default.id and status_id ~= data.player_status.whitelisted.id then
         return data.flag_player(player_id, true)
     end
     return true
@@ -579,7 +582,8 @@ function data.set_ip_status(ipint, executor_id, status_id, reason, expires)
         INSERT INTO ip_status_log (ip, executor_id, status_id, reason, expires, timestamp)
              VALUES               (?,  ?,           ?,         ?,      ?,       ?)
     ]]
-    if not execute_bind_one(code, 'set ip status', ipint, executor_id, status_id, reason, expires, os.time()) then return false end
+    local now = os.time()
+    if not execute_bind_one(code, 'set ip status', ipint, executor_id, status_id, reason, expires, now) then return false end
     local last_id = db:last_insert_rowid()
     code = 'UPDATE ip SET current_status_id = ? WHERE ip = ?'
     if not execute_bind_one(code, 'update ip last status id', last_id, ipint) then return false end
@@ -632,7 +636,8 @@ function data.set_asn_status(asn, executor_id, status_id, reason, expires)
         INSERT INTO asn_status_log (asn, executor_id, status_id, reason, expires, timestamp)
              VALUES                (?,   ?,           ?,         ?,      ?,       ?)
     ]]
-    if not execute_bind_one(code, 'set asn status', asn, executor_id, status_id, reason, expires, os.time()) then return false end
+    local now = os.time()
+    if not execute_bind_one(code, 'set asn status', asn, executor_id, status_id, reason, expires, now) then return false end
     local last_id = db:last_insert_rowid()
     code = 'UPDATE asn SET current_status_id = ? WHERE asn = ?'
     if not execute_bind_one(code, 'update asn last status id', last_id, asn) then return false end
@@ -644,7 +649,8 @@ function data.log(player_id, ipint, asn, success)
         INSERT INTO connection_log (player_id, ip, asn, success, timestamp)
              VALUES                 (?,         ?,  ?,   ?,       ?)
     ]]
-    if not execute_bind_one(code, 'log connection', player_id, ipint, asn, success, os.time()) then
+    local now = os.time()
+    if not execute_bind_one(code, 'log connection', player_id, ipint, asn, success) then
         return false
     end
     if success then
@@ -667,7 +673,8 @@ function data.assoc(player_id, ipint, asn)
         INSERT OR IGNORE INTO assoc (player_id, ip, asn, first_seen, last_seen)
                              VALUES (?,         ?,  ?,   ?,          ?)
     ]]
-    if not execute_bind_one(insert_code, 'insert assoc', player_id, ipint, asn, os.time(), os.time()) then return false end
+    local now = os.time()
+    if not execute_bind_one(insert_code, 'insert assoc', player_id, ipint, asn, now, now) then return false end
     local update_code = [[
         UPDATE assoc
            SET last_seen = ?
@@ -675,7 +682,7 @@ function data.assoc(player_id, ipint, asn)
            AND ip == ?
            AND asn == ?
     ]]
-    if not execute_bind_one(update_code, 'update assoc', os.time(), player_id, ipint, asn) then return false end
+    if not execute_bind_one(update_code, 'update assoc', now, player_id, ipint, asn) then return false end
     return true
 end
 function data.has_asn_assoc(player_id, asn)
@@ -695,14 +702,13 @@ function data.get_player_status_log(player_id)
     player_id = data.get_master(player_id) or player_id
     local code = [[
         SELECT executor.name executor_name
-             , status.name   status_name
+             , log.status_id status_id
              , log.timestamp timestamp
              , log.reason    reason
              , log.expires   expires
           FROM player_status_log log
           JOIN player                     ON log.player_id   == player.id
           JOIN player            executor ON log.executor_id == executor.id
-          JOIN player_status     status   ON log.status_id   == status.id
          WHERE player.id == ?
       ORDER BY log.timestamp
     ]]
@@ -711,13 +717,12 @@ end
 function data.get_ip_status_log(ipint)
     local code = [[
         SELECT executor.name executor_name
-             , status.name   status_name
+             , log.status_id status_id
              , log.timestamp timestamp
              , log.reason    reason
              , log.expires   expires
           FROM ip_status_log log
           JOIN player        executor ON log.executor_id == executor.id
-          JOIN ip_status     status   ON log.status_id   == status.id
          WHERE log.ip == ?
       ORDER BY log.timestamp
     ]]
@@ -726,13 +731,12 @@ end
 function data.get_asn_status_log(asn)
     local code = [[
         SELECT executor.name executor_name
-             , status.name   status_name
+             , log.status_id status_id
              , log.timestamp timestamp
              , log.reason    reason
              , log.expires   expires
           FROM asn_status_log log
           JOIN player         executor ON log.executor_id == executor.id
-          JOIN asn_status     status   ON log.status_id   == status.id
          WHERE log.asn == ?
       ORDER BY log.timestamp
     ]]
@@ -960,14 +964,13 @@ function data.get_ban_log(limit)
     local code = [[
         SELECT player.name                 player_name
              , executor.name               executor_name
-             , player_status.name          status_name
+             , player_status_log.status_id status_id
              , player_status_log.timestamp timestamp
              , player_status_log.reason    reason
              , player_status_log.expires   expires
           FROM player_status_log
           JOIN player          ON player.id        == player_status_log.player_id
           JOIN player executor ON executor.id      == player_status_log.executor_id
-          JOIN player_status   ON player_status.id == player_status_log.status_id
          WHERE player.id != (?)
          ORDER BY player_status_log.timestamp DESC
          LIMIT ?
@@ -985,7 +988,8 @@ function data.add_report(reporter_id, report)
                     (reporter_id, report, timestamp)
              VALUES (?          , ?     , ?        )
     ]]
-    return execute_bind_one(code, 'add report', reporter_id, report, os.time())
+    local now = os.time()
+    return execute_bind_one(code, 'add report', reporter_id, report, now)
 end
 
 function data.get_reports(from_time)
@@ -1117,7 +1121,7 @@ function data.get_alts(player_id)
           JOIN player alt    ON alt.master_id == master.id
          WHERE master.id == ?
     ]]
-    local master_id = data.get_master() or player_id
+    local master_id = data.get_master(player_id) or player_id
     local rows = get_full_ntable(code, 'get alts', master_id)
     if rows then
         local alts = {}
@@ -1130,13 +1134,16 @@ end
 
 function data.grep_player(pattern, limit)
     local code = [[
-        SELECT player.name                              name
-             , COALESCE(player_status_log.status_id, ?) player_status_id
+        SELECT player.name                 name
+             , player_status_log.status_id player_status_id
+             , last_log.ip                 ipint
+             , last_log.asn                asn
           FROM player
-     LEFT JOIN player_status_log ON player_status_log.id == player.current_status_id
+     LEFT JOIN player_status_log       ON player_status_log.id == player.current_status_id
+     LEFT JOIN connection_log last_log ON last_log.id == player.last_login_id
          WHERE LOWER(player.name) GLOB LOWER(?)
       ORDER BY LOWER(player.name)
          LIMIT ?
     ]]
-    return get_full_ntable(code, 'grep player', data.player_status.default.id, pattern, limit)
+    return get_full_ntable(code, 'grep player', pattern, limit)
 end

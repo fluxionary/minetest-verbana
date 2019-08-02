@@ -1,22 +1,25 @@
-
-rework /ban_record
-- make it a summary of whether a player might be suspicious based on known associations
-- like sban's ban record
-- function currently named ban_record would be renamed "record"
-- "so you want to specify his name, and see a list of banned/troublesome accounts from his ASN."
-- "so with one command, I should see, perhaps, IP-linked accounts, first and last login, ban record, and flagged accounts sharing their asn"
-
 create a way to search for players by IP/net instead of just ASN
 
-make way to show last login IP on certain commands (e.g. /inspect_asn)
+a command to *list* alts...
+incorporate alt status/connection logs into results...
 
-make settings for the hard-coded values for reporting timing
+remaining commands to be tested:
+- ip_suspect
+- ip_unsuspect
+- ip_block
+- ip_unblock
+- asn_block
+- asn_unblock
+
+DOCUMENTATION....
+
 
 alert staff if there are new reports since their last login
 
 a way to resolve reports?
 
-DOCUMENTATION....
+make settings for the hard-coded values for report rate limiting
+
 --------------
 
 # Administration
@@ -32,8 +35,9 @@ who2
 pgrep      <pattern> [<limit>=20]
 asn        <player_name> | <IP>
 cluster    <player_name>
+status     <player_name> [<number>]
 inspect    <player_name>
-ban_record <player_name> [<number>]
+ban_record <player_name>
 logins     <player_name> [<number>=20]
 
 # Player management
@@ -47,11 +51,11 @@ unverify    <player_name> [<reason>]
 whitelist   <player_name> [<reason>]
 unwhitelist <player_name> [<reason>]
 master     <alt> <master>
-master_rm  <player_name>
+unmaster  <player_name>
 
 # IP inspection
 ip_inspect <IP> [<timespan>=1w]
-ip_record  <IP> [<number>]
+ip_status  <IP> [<number>]
 
 # IP management
 ip_block     <IP> [<timespan>] [<reason>]
@@ -63,7 +67,7 @@ ip_untrust   <IP> [<reason>]
 
 # ASN inspection
 asn_inspect <ASN> [<timespan>=1w]
-asn_record  <ASN> [<number>]
+asn_status  <ASN> [<number>]
 asn_stats   <ASN>
 
 # ASN management
