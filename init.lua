@@ -9,11 +9,6 @@ function verbana.log(level, message, ...)
     minetest.log(level, ('[%s] %s'):format(modname, message))
 end
 
-verbana.ie = minetest.request_insecure_environment()
-if not verbana.ie then
-	error('Verbana will not work unless it has been listed under secure.trusted_mods in minetest.conf')
-end
-
 -- settings
 dofile(verbana.modpath .. '/settings.lua')
 dofile(verbana.modpath .. '/privs.lua')
@@ -27,8 +22,15 @@ dofile(verbana.modpath .. '/util.lua')
 dofile(verbana.modpath .. '/lib_ip.lua')
 dofile(verbana.modpath .. '/lib_asn.lua')
 
--- connect to the DB - MAKE SURE TO CLEAN UP ALL "insecure" access points!
-local sql = verbana.ie.require('lsqlite3') -- TODO what happens if this isn't installed? ....
+-- connect to the DB - restrict access to full insecure environment to this point
+local ie = minetest.request_insecure_environment()
+if not ie then
+	error('Verbana will not work unless it has been listed under secure.trusted_mods in minetest.conf')
+end
+
+local sql = ie.require('lsqlite3')
+ie = nil -- nuke this as quickly as possible
+
 if not sql then
     error('Verbana will not work unless lsqlite3 is installed. See README.txt')
 end
@@ -48,6 +50,7 @@ minetest.register_on_shutdown(verbana.util.safe(function()
     end
 end))
 
+
 -- core
 dofile(verbana.modpath .. '/data.lua') -- data must go first
 dofile(verbana.modpath .. '/chat.lua') -- chat must go before login_handling
@@ -56,6 +59,5 @@ dofile(verbana.modpath .. '/commands.lua')
 
 -- cleanup (prevent access to insecure environment from any outside mod, or in-game)
 sqlite3 = nil
-verbana.ie = nil
 verbana.sql = nil
 verbana.db = nil
