@@ -650,7 +650,7 @@ function data.log(player_id, ipint, asn, success)
              VALUES                 (?,         ?,  ?,   ?,       ?)
     ]]
     local now = os.time()
-    if not execute_bind_one(code, 'log connection', player_id, ipint, asn, success) then
+    if not execute_bind_one(code, 'log connection', player_id, ipint, asn, success, now) then
         return false
     end
     if success then
