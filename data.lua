@@ -295,11 +295,14 @@ local function init_db()
     end
     initialize_static_data()
 
-    local sban_path = minetest.get_worldpath() .. '/sban.sqlite'
-    if util.file_exists(sban_path) then
-        log('action', 'automatically importing existing sban DB')
-        if not data.import_from_sban(sban_path) then
-            log('error', 'failed to import existing sban DB')
+    if current_version == 0 or verbana.settings.debug_mode then
+        -- auto import sban on first boot or in debug mode
+        local sban_path = minetest.get_worldpath() .. '/sban.sqlite'
+        if util.file_exists(sban_path) then
+            log('action', 'automatically importing existing sban DB')
+            if not data.import_from_sban(sban_path) then
+                log('error', 'failed to import existing sban DB')
+            end
         end
     end
 end
