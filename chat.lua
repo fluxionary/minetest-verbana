@@ -5,8 +5,9 @@ local privs = verbana.privs
 
 function verbana.chat.tell_mods(message, ...)
     message = message:format(...)
-    if minetest.global_exists('irc') then irc:say(message) end
-    if minetest.global_exists('irc2') then irc2:say(message) end
+    local irc_message = minetest.strip_colors(message)
+    if minetest.global_exists('irc') then irc:say(irc_message) end
+    if minetest.global_exists('irc2') then irc2:say(irc_message) end
 
     for _, player in ipairs(minetest.get_connected_players()) do
         local name = player:get_player_name()
