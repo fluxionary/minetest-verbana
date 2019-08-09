@@ -278,8 +278,6 @@ local function init_db()
         error('[Verbana] error getting current DB version; aborting.')
     elseif current_version > data.version then
         error('[Verbana] database version is more recent than code version; please upgrade code.')
-    elseif current_version == data.version then
-        return -- everything is up to date
     elseif current_version == 0 or verbana.settings.debug_mode then
         -- wipe any pre-existing copies of the schema
         if not clean_db() then
@@ -288,6 +286,8 @@ local function init_db()
         intialize_schema()
         current_version = 1
         initialized = true
+    elseif current_version == data.version then
+        return -- everything is up to date
     end
     for i = current_version + 1, data.version do
         migrate_db(i)
