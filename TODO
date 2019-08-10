@@ -1,26 +1,16 @@
-create a way to search for players by IP/net instead of just ASN
-
-a command to *list* alts...
-incorporate alt status/connection logs into results...
-
-remaining commands to be tested:
-- ip_suspect
-- ip_unsuspect
-- ip_block
-- ip_unblock
-- asn_block
-- asn_unblock
-
 DOCUMENTATION....
 
+create a way to search for players by IP/net instead of just ASN
+
+a command to *list* alts associated w/ a master
+incorporate alt status/connection logs into results...
 
 alert staff if there are new reports since their last login
-
-a way to resolve reports?
 
 make settings for the hard-coded values for report rate limiting
 
 --------------
+list of commands for documentation:
 
 # Administration
 sban_import  [<filename>]
