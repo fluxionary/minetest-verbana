@@ -1087,7 +1087,7 @@ register_chatcommand('logins', {
             local asn_description = lib_asn.get_description(row.asn)
             local message = ('%s:%s from %s<%s> A%s<%s> (%s)'):format(
                 iso_date(row.timestamp),
-                (rows.success and '') or ' failed!',
+                (row.success and '') or ' failed!',
                 colorize(ip_status_color, lib_ip.ipint_to_ipstr(row.ipint)),
                 colorize(ip_status_color, ip_status_name),
                 colorize(asn_status_color, row.asn),
