@@ -1,4 +1,4 @@
-Verbana: Verification and banning mod for minetest
+Verbana: Verification and banning mod for Minetest
 ==================================================
 
 CURRENTLY A NON-FUNCTIONAL WIP. DO NOT USE UNTIL THIS MESSAGE HAS BEEN REMOVED.
@@ -58,14 +58,42 @@ Some features of sban that the first release of Verbana will likely lack:
 Requirements
 ============
 
+* Minetest 5.0 or later.
 * Verbana must be listed as a trusted mod in minetest.conf (`secure.trusted_mods`), 
   in order to use a sqlite database.
-* lsqlite3 (SQLite3 for Lua) must be installed and accessible to minetest's Lua.
+* lsqlite3 (SQLite3 for Lua) must be installed and accessible to Minetest's Lua.
  * The easiest way I know how to do this: install luarocks, and execute 
-   `sudo luarocks --lua-version 5.1 install lsqlite3`
-* The minetest server must use IPv4 exclusively. I've made zero attempt to support 
+   `luarocks --lua-version 5.1 install lsqlite3` or the appropriate variation. 
+* The Minetest server must use IPv4 exclusively. I've made zero attempt to support 
   IPv6. 
+* There's some soft dependencies on linux. Windows users may need to make some changes,
+  which I would gladly accept as a PR.
 
+Optional Dependencies
+---------------------
+
+Verbana can make use of the stock IRC mod, as well as the "IRC2" mod that is used on
+the Blocky Survival server to connect to a second IRC server. 
+
+Sban and verification are also listed as optional dependencies, but this is primarily
+in order for verbana to detect their presence. By default, verbana will run in 
+"debug mode" if these mods are detected. If you wish to use verbana as intended, you do
+*not* want these mods installed.
+
+Setup
+=====
+
+If you don't know the basics of installing a minetest mod, please see
+* https://wiki.minetest.net/Installing_Mods
+* https://dev.minetest.net/Installing_Mods
+
+Verbana must be marked as a trusted mod, with a line like the following added to
+minetest.conf:
+```secure.trusted_mods = verbana``` 
+
+The only "trusted" thing verbana does is load lsqlite so that it can interact with
+its database. To our knowledge, verbana cannot leak the insecure environment, but 
+it can leak the lsqlite interface in minetest 5.0.1 and development versions 
 
 
 

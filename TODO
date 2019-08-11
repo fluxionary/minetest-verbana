@@ -1,8 +1,9 @@
+for commands that take a case-insentive username, we MUST print the actual username...
+
 DOCUMENTATION....
 
 create a way to search for players by IP/net instead of just ASN
 
-a command to *list* alts associated w/ a master
 incorporate alt status/connection logs into results...
 
 alert staff if there are new reports since their last login
