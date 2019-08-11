@@ -1125,7 +1125,7 @@ function data.get_alts(player_id)
          WHERE master.id == ?
     ]]
     local master_id = data.get_master(player_id) or player_id
-    local rows = get_full_ntable(code, 'get alts', master_id)
+    local rows = get_full_ntable(code, 'get alts', master_id, master_id)
     if rows then
         local alts = {}
         for _, row in ipairs(rows) do
