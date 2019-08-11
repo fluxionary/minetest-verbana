@@ -856,10 +856,10 @@ end
 
 function data.get_player_associations(player_id)
     local code = [[
-        SELECT assoc.ip          ipint
-             , assoc.asn         asn
-             , ip_status_log.id  ip_status_id
-             , asn_status_log.id asn_status_id
+        SELECT assoc.ip                 ipint
+             , assoc.asn                asn
+             , ip_status_log.status_id  ip_status_id
+             , asn_status_log.status_id asn_status_id
           FROM assoc
           JOIN player         ON player.id == assoc.player_id
           JOIN ip             ON ip.ip == assoc.ip
