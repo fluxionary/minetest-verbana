@@ -260,12 +260,7 @@ minetest.register_on_newplayer(safe(function(player)
         minetest.after(1, move_to, name, unverified_spawn_pos)
         log('action', 'new player %s sent to verification', name)
     else
-        data.set_player_status(
-            player_id,
-            data.verbana_player_id,
-            data.player_status.default.id,
-            'new player'
-        )
+        data.get_player_status(player_id, true) -- create a new status if they don't have one
         log('action', 'new player %s', name)
     end
 end))
