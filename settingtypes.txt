@@ -19,8 +19,8 @@ verbana.unverified_privs (Privs for unverified users) string shout
 # Comma delimited. If a player has all of the listed privileges, they skip suspicious network checks.
 verbana.whitelisted_privs (Privs required to bypass suspicious network checks) string
 
-# Coordinates where unverified players spawn
-verbana.unverified_spawn_pos (Where unverified players spawn) string (0,0,0)
+# Coordinates where unverified players spawn. Defaults to static_spawnpoint
+verbana.unverified_spawn_pos (Where unverified players spawn) string
 
 # Coordinates bounding the verification jail area, if it exists.
 # Format: (x1,y1,z1),(x2,y2,z2)
@@ -34,4 +34,4 @@ verbana.universal_verification (Enable verification for all new users) bool fals
 
 # In debug mode, Verbana will not block any players from connecting, change their privileges,
 # or anything else that affects game-play.
-verbana.debug_mode (Whether to run verbana in debug mode) bool true
+verbana.debug_mode (Whether to run verbana in debug mode) bool false

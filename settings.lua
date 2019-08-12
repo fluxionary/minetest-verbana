@@ -1,6 +1,7 @@
 verbana.settings = {}
 
 local settings = minetest.settings
+local world_path = minetest.get_worldpath()
 
 function verbana.settings.set_universal_verification(value)
     if type(value) == 'boolean' then
@@ -44,9 +45,9 @@ local function get_jail_bounds()
     return {vector.new(x1, y1, z1), vector.new(x2, y2, z2)}
 end
 
-verbana.settings.db_path = get_setting('verbana.db_path', ('%s/verbana.sqlite'):format(minetest.get_worldpath()))
-verbana.settings.asn_description_path = get_setting('verbana.asn_description_path', ('%s/%s'):format(verbana.modpath, 'data-used-autnums'))
-verbana.settings.asn_data_path = get_setting('verbana.asn_data_path', ('%s/%s'):format(verbana.modpath, 'data-raw-table'))
+verbana.settings.db_path = get_setting('verbana.db_path', ('%s/verbana.sqlite'):format(world_path))
+verbana.settings.asn_description_path = get_setting('verbana.asn_description_path', ('%s/data-used-autnums'):format(verbana.modpath))
+verbana.settings.asn_data_path = get_setting('verbana.asn_data_path', ('%s/data-raw-table'):format(verbana.modpath))
 
 verbana.settings.admin_priv = get_setting('verbana.admin_priv', 'ban_admin')
 verbana.settings.moderator_priv = get_setting('verbana.moderator_priv', 'basic_privs')
@@ -57,7 +58,7 @@ verbana.settings.whitelisted_privs = minetest.string_to_privs(get_setting('verba
 if #verbana.settings.whitelisted_privs == 0 then verbana.settings.whitelisted_privs = nil end
 
 verbana.settings.spawn_pos = minetest.string_to_pos(get_setting('static_spawnpoint', '(0,0,0)'))
-verbana.settings.unverified_spawn_pos = minetest.string_to_pos(get_setting('verbana.unverified_spawn_pos', '(0,0,0)'))
+verbana.settings.unverified_spawn_pos = minetest.string_to_pos(get_setting('verbana.unverified_spawn_pos', verbana.settings.spawn_pos))
 
 verbana.settings.universal_verification = settings:get_bool('verbana.universal_verification', false)
 verbana.settings.jail_bounds = get_jail_bounds()
