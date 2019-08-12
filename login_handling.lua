@@ -115,19 +115,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     local suspicious = false
     local return_value
 
-    if player_status.id == data.player_status.whitelisted.id then
-        -- if the player is whitelisted, let them in.
-        log('action', '[prejoin] %s is whitelisted', name)
-    elseif settings.whitelisted_privs and check_player_privs(name, settings.whitelisted_privs) then
-        -- if the player has a whitelisted priv, let them in.
-        log('action', '[prejoin] %s whitelisted by privs', name)
-    elseif ip_status.id == data.ip_status.trusted.id then
-        -- let them in
-        log('action', '[prejoin] %s is trusted', ipstr)
-    elseif ip_status.id == data.ip_status.suspicious.id then
-        suspicious = true
-        log('action', '[prejoin] %s is suspicious', ipstr)
-    elseif player_status.id == data.player_status.banned.id then
+    if player_status.id == data.player_status.banned.id then
         local reason = player_status.reason
         if player_status.expires then
             local expires = iso_date(player_status.expires or now)
@@ -143,6 +131,18 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
                 return_value = ('Account %q is banned.'):format(name)
             end
         end
+    elseif player_status.id == data.player_status.whitelisted.id then
+        -- if the player is whitelisted, let them in.
+        log('action', '[prejoin] %s is whitelisted', name)
+    elseif settings.whitelisted_privs and check_player_privs(name, settings.whitelisted_privs) then
+        -- if the player has a whitelisted priv, let them in.
+        log('action', '[prejoin] %s whitelisted by privs', name)
+    elseif ip_status.id == data.ip_status.trusted.id then
+        -- let them in
+        log('action', '[prejoin] %s is trusted', ipstr)
+    elseif ip_status.id == data.ip_status.suspicious.id then
+        suspicious = true
+        log('action', '[prejoin] %s is suspicious', ipstr)
     elseif ip_status.id == data.ip_status.blocked.id then
         local reason = ip_status.reason
         if ip_status.expires then
