@@ -7,6 +7,11 @@ Name
 ----
 A portmanteau of "verification", "ban", and the herb verbena.
 
+Terminology
+-----------
+
+The terms `network` and `ASN` are used interchangeably in this document.  
+
 Motivation
 ----------
 
@@ -80,27 +85,220 @@ in order for verbana to detect their presence. By default, verbana will run in
 "debug mode" if these mods are detected. If you wish to use verbana as intended, you do
 *not* want these mods installed.
 
-Setup
-=====
+Installation
+============
 
 If you don't know the basics of installing a minetest mod, please see
 * https://wiki.minetest.net/Installing_Mods
 * https://dev.minetest.net/Installing_Mods
 
+Trust the mod
+-------------
+
 Verbana must be marked as a trusted mod, with a line like the following added to
 minetest.conf:
-```secure.trusted_mods = verbana``` 
+```
+secure.trusted_mods = verbana
+``` 
 
 The only "trusted" thing verbana does is load lsqlite so that it can interact with
 its database. To our knowledge, verbana cannot leak the insecure environment, but 
-it can leak the lsqlite interface in minetest 5.0.1 and development versions 
+it can leak the lsqlite interface in minetest 5.0.1 and development versions before
+commit ecd20de. 
 
+Download ASN tables
+-------------------
 
+Once you have put the verbana mod in the correct place, you will need to download the
+ASN tables that verbana uses to correlate IP numbers with networks. On Linux
+systems, you should just be able to run the script `update_tables.sh`. On other systems,
+you will need to find another way to download those files, and convert the 
+data-used-autnums file from ths ISO-8859-1 encoding to utf8. 
 
+The ASN tables update regularly, though for the most part nothing major changes.
+You should put a process in place that updates these automatically (or manually)
+some period between daily and monthly. 
 
+Configuration
+-------------
 
---------------
-list of commands for documentation:
+The following configuration options are available, and can be set in your `minetest.conf`
+file.
+
+* `verbana.db_path` 
+  
+  The location verbana will store its database. Defaults to `${WORLD_ROOT}/verbana.sqlite`.
+   
+* `verbana.asn_description_path`
+
+  The location of the ASN description file. Defaults to `${MOD_ROOT}/data-used-autnums`
+
+* `verbana.asn_data_path`
+
+  The location of the ASN data file. Defaults to `${MOD_ROOT}/data-raw-table`
+
+* `verbana.admin_priv`
+
+  The privilege needed to administer verbana. Defaults to `ban_admin`. This privilege will
+  be created if it does not currently exist.
+
+* `verbana.moderator_priv`
+
+  The privilege needed to administer verbana. Defaults to `basic_privs`. This privilege will
+  be created if it does not currently exist.
+
+* `verbana.unverified_privs`
+
+  The privileges granted to users with the "unverified" status. Defaults to `shout`. 
+  If there are multiple privileges, they should be comma-delimited.
+
+* `default_privs`
+
+  This is a core setting, not a verbana-specific one. Verbana uses it to determine what
+  privileges to give to players once they are verified. Defaults to `shout,interact`.
+  If there are multiple privileges, they should be comma-delimited.
+
+* `verbana.whitelisted_privs`
+
+  A list of privileges that are equivalent to the `whitelisted` status. If a player has
+  all of the listed privileges, they skip the suspicious network checks on login. By
+  default, it is blank i.e. disabled.  
+
+* `static_spawnpoint`
+
+  This is a core setting, not a verbana-specific one. Verbana uses this to determine
+  where a normal (verified) player will spawn, and where to move players that are
+  newly verified. It is a list of coordinates `(x,y,z)`, and defaults to  `(0,0,0)`.
+
+* `verbana.unverified_spawn_pos`
+
+  Coordinates where unverified players will spawn. It is a list of coordinates
+  `(x,y,z)` and defaults to the value of `static_spawnpoint`.
+
+* `verbana.jail_bounds`
+
+  Boundaries for the verification "jail" area, if one exists. It needs to be specified
+  as a pair of coordinates, (x1,y1,z1),(x2,y2,z2), that specify the 3d bounding box
+  of the jail. If a jail is defined, `verbana.unverified_spawn_pos` should be
+  *inside* of the jail, or unexpected behavior may result. 
+
+* `verbana.jail_check_period`
+
+  A period, specified in seconds, between checks of whether an unverified player has
+  escaped the verification jail. It defaults to 0, which disables the jail.
+  
+  Both `verbana.jail_bounds` and `verbana.jail_check_period` must be defined in
+  order for the verification jail to be enabled.
+
+* `verbana.universal_verification`
+
+  If set to `true`, all new users must be verified. Otherwise, only players from suspicious 
+  networks need be verified. Defaults to `false`
+
+* `verbana.debug_mode`
+
+  Whether to run verbana in debug mode. By default, verbana will run in debug mode if 
+  the sban or verification mod are installed and enabled. Setting this will override
+  that behavior, if that is desired.
+  
+  In debug mode, verbana will (1) reload the schema on every server startup
+  (2) automatically import data from sban, if its DB is found (3) not make any changes
+  to player privileges (4) not block any users from connecting to the server (5) not 
+  kick any users from the server. 
+
+Functionality
+=============
+
+Verbana assigns a "status" to all players, IPs, and networks that determines in what 
+cases players can connect to the server. 
+
+Player Status
+-------------
+
+* `default`
+
+  Most players will have the `default` status.
+
+* `banned`
+
+  A player who has been banned will not be able to connect to the server. Note
+  that banning one account does not generally prevent other accounts from
+  connecting from IPs or Networks that the user has been associated with. However,
+  it will temporarily mark the last-known IP of the user as suspicious.
+
+* `unverified`
+
+  A new player that connects from a suspicious IP or network is automatically
+  marked as `unverified`. Unverified users have reduced privileges (by default,
+  they lack `interact`), and must be verified by a verbana admin or moderator 
+  before they can play the game or communicate with ordinary players. 
+
+* `suspicious`
+
+  A player that has been marked as `suspicious` has no real restrictions,
+  but verbana moderators and admins will be alerted when the player logs in or
+  performs certain other actions.
+
+* `whitelisted`
+
+  A player that has been whitelisted will be allowed to bypass the suspicious
+  network checks when they join the server. 
+
+IP status
+---------
+
+* `default`
+
+  Most IPs will have the `default` status.
+
+* `blocked`
+
+  All connections from blocked IPs will be denied, except for whitelisted players.
+
+* `suspicious`
+
+  A new player connecting from a `suspicious` IP will be forced to go through
+  verification, unless the player is whitelisted. An attempt to connect from a 
+  suspicious IP as an existing player will be denied, if that player has never 
+  connected from that network before. 
+
+* `trusted`
+
+  An IP in a suspicious network may be marked as `trusted`, which indicates that
+  connections from that IP will bypass suspicious network checks. 
+  
+ASN status
+----------
+
+* `default`
+
+  Most networks will have the `default` status.
+
+* `blocked`
+
+  All connections from this network will be denied, unless the player is whitelisted
+  or the IP is trusted.
+
+* `suspicious`
+
+  A new player connecting from a `suspicious` network will be forced to go through
+  verification, unless the player is whitelisted. An attempt to connect from a 
+  suspicious network as an existing player will be denied, if that player has never 
+  connected from that network before. 
+
+Master accounts and alts
+------------------------
+
+It is possible to link accounts together in a master/alt account relationship. In
+such a relationship, changes in the status to one account will be reflected by them
+all. This can be used to associate new accounts w/ existing accounts that are
+banned, to quickly ban those accounts. 
+
+An account can have only one master. A master account cannot have another account as its master;
+you can't chain the master/alt relationship.  
+
+Commands
+========
 
 # Administration
 sban_import  [<filename>]
