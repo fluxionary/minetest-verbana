@@ -1,5 +1,9 @@
 for commands that take a case-insentive username, we MUST print the actual username...
 
+add ip_temp_suspect and asn_temp_suspect commands
+
+when banning a user, automatically temp_suspect their last known IP
+
 DOCUMENTATION....
 
 create a way to search for players by IP/net instead of just ASN
