@@ -1,27 +1,32 @@
-verbana.commands       = {}
+verbana.commands            = {}
 
-local data             = verbana.data
-local lib_asn          = verbana.lib_asn
-local lib_ip           = verbana.lib_ip
-local log              = verbana.log
-local settings         = verbana.settings
-local util             = verbana.util
+local data                  = verbana.data
+local lib_asn               = verbana.lib_asn
+local lib_ip                = verbana.lib_ip
+local log                   = verbana.log
+local settings              = verbana.settings
+local util                  = verbana.util
 
-local mod_priv         = verbana.privs.moderator
-local admin_priv       = verbana.privs.admin
-local debug_mode       = settings.debug_mode
+local mod_priv              = verbana.privs.moderator
+local admin_priv            = verbana.privs.admin
+local debug_mode            = settings.debug_mode
 
-local parse_timespan   = util.parse_timespan
-local safe             = util.safe
-local safe_kick_player = util.safe_kick_player
-local table_contains   = util.table_contains
-local iso_date         = util.iso_date
+local parse_timespan        = util.parse_timespan
+local safe                  = util.safe
+local safe_kick_player      = util.safe_kick_player
+local table_contains        = util.table_contains
+local iso_date              = util.iso_date
 
-local colorize         = minetest.colorize
+local worldpath             = minetest.get_worldpath()
+local colorize              = minetest.colorize
+local get_player_by_name    = minetest.get_player_by_name
+local set_player_privs      = minetest.set_player_privs
+local mt_chat_send_player   = minetest.chat_send_player
+local get_connected_players = minetest.get_connected_players
 
 local function chat_send_player(name, message, ...)
     message = message:format(...)
-    minetest.chat_send_player(name, message)
+    mt_chat_send_player(name, message)
 end
 
 local function register_chatcommand(name, def)
@@ -47,7 +52,7 @@ local function alias_chatcommand(name, existing_name)
     end
     local existing_def = minetest.registered_chatcommands[existing_name]
     if not existing_def then
-        verbana.log('error', "Could not alias command %q to %q, because %q doesn't exist", name, existing_name, existing_name)
+        log('error', "Could not alias command %q to %q, because %q doesn't exist", name, existing_name, existing_name)
     else
         minetest.register_chatcommand(name, existing_def)
     end
@@ -60,7 +65,7 @@ register_chatcommand('sban_import', {
     privs={[admin_priv]=true},
     func=function (caller, filename)
         if not filename or filename == '' then
-            filename = minetest.get_worldpath() .. '/sban.sqlite'
+            filename = worldpath .. '/sban.sqlite'
         end
         if not util.file_exists(filename) then
             return false, ('Could not open file %q.'):format(filename)
@@ -87,10 +92,10 @@ register_chatcommand('verification', {
         else
             return false, 'Invalid parameters'
         end
-        if verbana.settings.universal_verification == value then
+        if settings.universal_verification == value then
             return true, ('Universal verification is already %s'):format(params)
         end
-        verbana.settings.set_universal_verification(value)
+        settings.set_universal_verification(value)
         return true, ('Turned universal verification %s'):format(params)
     end
 })
@@ -131,12 +136,12 @@ local function parse_player_status_params(params)
     if not name or name:len() > 20 then
         return nil, nil, nil, ('Invalid argument(s): %q'):format(params)
     end
-    local player_id = data.get_player_id(name)
+    local player_id, player_name = data.get_player_id(name)
     if not player_id then
         return nil, nil, nil, ('Unknown player: %s'):format(name)
     end
     local player_status = data.get_player_status(player_id, true)
-    return player_id, name, player_status, reason
+    return player_id, player_name, player_status, reason
 end
 
 local function has_suspicious_connection(player_id)
@@ -183,9 +188,9 @@ register_chatcommand('verify', {
         end
         log('action', 'setting verified privs for %s', player_name)
         if not debug_mode then
-            minetest.set_player_privs(player_name, settings.verified_privs)
+            set_player_privs(player_name, settings.verified_privs)
         end
-        local player = minetest.get_player_by_name(player_name)
+        local player = get_player_by_name(player_name)
         if player then
             log('action', 'moving %s to spawn', player_name)
             if not debug_mode then
@@ -225,9 +230,9 @@ register_chatcommand('unverify', {
         end
         log('action', 'setting unverified privs for %s', player_name)
         if not debug_mode then
-            minetest.set_player_privs(player_name, settings.unverified_privs)
+            set_player_privs(player_name, settings.unverified_privs)
         end
-        local player = minetest.get_player_by_name(player_name)
+        local player = get_player_by_name(player_name)
         if player then
             log('action', 'moving %s to unverified area', player_name)
             if not debug_mode then
@@ -252,7 +257,7 @@ override_chatcommand('kick', {
         if not player_id then
             return false, reason
         end
-		local player = minetest.get_player_by_name(player_name)
+		local player = get_player_by_name(player_name)
 		if not player then
 			return false, ("Player %s not in game!"):format(player_name)
         end
@@ -299,7 +304,7 @@ override_chatcommand('ban', {
             }, player_status.id) then
             return false, ('Cannot ban %s w/ status %s'):format(player_name, player_status.name)
         end
-		local player = minetest.get_player_by_name(player_name)
+		local player = get_player_by_name(player_name)
         if player then
             safe_kick_player(caller, player, reason)
         end
@@ -848,7 +853,7 @@ register_chatcommand('status', {
         if not name then
             return false, 'invalid arguments'
         end
-        local player_id = data.get_player_id(name)
+        local player_id, name = data.get_player_id(name)
         if not player_id then
             return false, 'unknown player'
         end
@@ -857,7 +862,7 @@ register_chatcommand('status', {
             return false, 'An error occurred (see server logs)'
         end
         if #rows == 0 then
-            return true, 'No records found.'
+            return true, ('No records found for %s.'):format(name)
         end
         local starti
         if numberstr then
@@ -866,6 +871,7 @@ register_chatcommand('status', {
         else
             starti = 1
         end
+        chat_send_player(caller, ('Records for %s'):format(name))
         for index = starti,#rows do
             local row = rows[index]
             local status_name = data.player_status_name[row.status_id] or data.player_status.default.name
@@ -898,7 +904,8 @@ register_chatcommand('ban_record', {
         if not player_name or player_name:len() > 20 then
             return false, 'Invalid argument'
         end
-        local player_id = data.get_player_id(player_name)
+        local player_id
+        player_id, player_name = data.get_player_id(player_name)
         if not player_id then
             return false, 'Unknown player'
         end
@@ -906,30 +913,38 @@ register_chatcommand('ban_record', {
         local ipint = lib_ip.ipstr_to_ipint(ipstr)
         local asn, asn_description = lib_asn.lookup(ipint)
 
-        chat_send_player(caller, "Accounts associated by IP:")
+        chat_send_player(caller, "Ban record for %s", player_name)
+
         local rows = data.get_player_cluster(player_id)
         if not rows then return false, 'An error occurred (see server logs)' end
-        local clustered = {}
-        for _, row in ipairs(rows) do
-            local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
-            table.insert(clustered, colorize(color, row.player_name))
+        if #rows > 0 then
+            local clustered = {}
+            for _, row in ipairs(rows) do
+                local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
+                table.insert(clustered, colorize(color, row.player_name))
+            end
+            chat_send_player(caller, "Accounts associated by IP:")
+            chat_send_player(caller, table.concat(clustered, ', '))
         end
-        chat_send_player(caller, table.concat(clustered, ', '))
 
-        chat_send_player(caller, "Flagged accounts on A%s (%s):", asn, asn_description)
         rows = data.get_asn_associations(asn, os.time() - parse_timespan('1y'))
         if not rows then return false, 'An error occurred (see server logs)' end
-        local assocs = {}
-        for _, row in ipairs(rows) do
-            local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
-            table.insert(assocs, colorize(color, row.player_name))
+        if #rows > 0 then
+            local assocs = {}
+            for _, row in ipairs(rows) do
+                local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
+                table.insert(assocs, colorize(color, row.player_name))
+            end
+            chat_send_player(caller, "Flagged accounts on A%s (%s):", asn, asn_description)
+            chat_send_player(caller, table.concat(assocs, ', '))
         end
-        chat_send_player(caller, table.concat(assocs, ', '))
 
-        chat_send_player(caller, "Account status:")
         rows = data.get_player_status_log(player_id)
         if not rows then
             return false, 'An error occurred (see server logs)'
+        end
+        if #rows > 0 then
+            chat_send_player(caller, "Account status:")
         end
         for index = 1,#rows do
             local row = rows[index]
@@ -1068,7 +1083,8 @@ register_chatcommand('logins', {
         if not name or not limit then
             return false, 'Invalid arguments'
         end
-        local player_id = data.get_player_id(name)
+        local player_id
+        player_id, name = data.get_player_id(name)
         if not player_id then
             return false, 'Unknown player'
         end
@@ -1079,13 +1095,16 @@ register_chatcommand('logins', {
         if #rows == 0 then
             return true, 'No records found.'
         end
+        chat_send_player(caller, "Login record for %s", name)
         for _, row in ipairs(rows) do
             local ip_status_name = data.ip_status_name[row.ip_status_id] or data.ip_status.default.name
             local ip_status_color = data.ip_status_color[row.ip_status_id] or data.ip_status.default.color
             local asn_status_name = data.asn_status_name[row.asn_status_id] or data.asn_status.default.name
             local asn_status_color = data.asn_status_color[row.asn_status_id] or data.asn_status.default.color
             local asn_description = lib_asn.get_description(row.asn)
-            local message = ('%s:%s from %s<%s> A%s<%s> (%s)'):format(
+            chat_send_player(
+                caller,
+                '%s:%s from %s<%s> A%s<%s> (%s)',
                 iso_date(row.timestamp),
                 (row.success and '') or ' failed!',
                 colorize(ip_status_color, lib_ip.ipint_to_ipstr(row.ipint)),
@@ -1094,7 +1113,6 @@ register_chatcommand('logins', {
                 colorize(asn_status_color, asn_status_name),
                 colorize(asn_status_color, asn_description)
             )
-            chat_send_player(caller, message)
         end
         return true
     end
@@ -1109,7 +1127,7 @@ register_chatcommand('inspect', {
         if not name or name:len() > 20 then
             return false, 'Invalid argument'
         end
-        local player_id = data.get_player_id(name)
+        local player_id, name = data.get_player_id(name)
         if not player_id then
             return false, 'Unknown player'
         end
@@ -1120,7 +1138,7 @@ register_chatcommand('inspect', {
         if #rows == 0 then
             return true, 'No records found.'
         end
-        chat_send_player(caller, ('Records for %s'):format(name))
+        chat_send_player(caller, 'Records for %s', name)
         for _, row in ipairs(rows) do
             local ipstr = lib_ip.ipint_to_ipstr(row.ipint)
             local asn_description = lib_asn.get_description(row.asn)
@@ -1128,14 +1146,15 @@ register_chatcommand('inspect', {
             local ip_status_color = data.ip_status_color[row.ip_status_id] or data.ip_status.default.color
             local asn_status_name = data.asn_status_name[row.asn_status_id] or data.asn_status.default.name
             local asn_status_color = data.asn_status_color[row.asn_status_id] or data.asn_status.default.color
-            local message = ('%s<%s> A%s (%s) <%s>'):format(
+            chat_send_player(
+                caller,
+                '%s<%s> A%s (%s) <%s>',
                 colorize(ip_status_color, ipstr),
                 colorize(ip_status_color, ip_status_name),
                 colorize(asn_status_color, row.asn),
                 colorize(asn_status_color, asn_description),
                 colorize(asn_status_color, asn_status_name)
             )
-            chat_send_player(caller, message)
         end
         return true
     end
@@ -1269,7 +1288,8 @@ register_chatcommand('cluster', {
         if not player_name or player_name:len() > 20 then
             return false, 'Invalid argument'
         end
-        local player_id = data.get_player_id(player_name)
+        local player_id
+        player_id, player_name = data.get_player_id(player_name)
         if not player_id then
             return false, 'Unknown player'
         end
@@ -1280,14 +1300,16 @@ register_chatcommand('cluster', {
         if #rows == 0 then
             return true, 'No records found.'
         end
+        chat_send_player(caller, "Accounts associated with %s:", player_name)
         for _, row in ipairs(rows) do
             local status_name = data.player_status_name[row.player_status_id] or data.player_status.default.name
             local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
-            local message = ('% 20s: %s'):format(
+            chat_send_player(
+                caller,
+                '% 20s: %s',
                 row.player_name,
                 colorize(status_color, status_name)
             )
-            chat_send_player(caller, message)
         end
         return true
     end
@@ -1299,7 +1321,7 @@ register_chatcommand('who2', {
     privs={[mod_priv]=true},
     func=function(caller)
         local names = {}
-        for _, player in ipairs(minetest.get_connected_players()) do
+        for _, player in ipairs(get_connected_players()) do
             table.insert(names, player:get_player_name())
         end
         table.sort(names, function(a, b) return a:lower() < b:lower() end)
@@ -1308,7 +1330,7 @@ register_chatcommand('who2', {
             local player_status = data.get_player_status(player_id)
             local player_status_color = data.player_status_color[player_status.id]
 
-            local ipstr = verbana.data.fumble_about_for_an_ip(name, player_id)
+            local ipstr = data.fumble_about_for_an_ip(name, player_id)
             local ipint = lib_ip.ipstr_to_ipint(ipstr)
             local ip_status = data.get_ip_status(ipint)
             local ip_status_color = data.ip_status_color[ip_status.id]
@@ -1424,7 +1446,7 @@ register_chatcommand('reports', {
             timespan = 60*60*24*7
         end
         local from_time = os.time() - timespan
-        local rows = verbana.data.get_reports(from_time)
+        local rows = data.get_reports(from_time)
         if not rows then
             return false, 'An error occurred (see server logs)'
         elseif #rows == 0 then
@@ -1448,7 +1470,7 @@ register_chatcommand('first-login', {
         if params == '' then
             params = reporter
         end
-        local player_id = data.get_player_id(params)
+        local player_id, player_name = data.get_player_id(params)
         if not player_id then
             return false, 'Unknown player'
         end
@@ -1458,7 +1480,7 @@ register_chatcommand('first-login', {
         elseif #rows == 0 then
             return true, 'No record of player logging in'
         end
-        return true, iso_date(rows[1].timestamp)
+        return true, ("%s: %s"):format(player_name, iso_date(rows[1].timestamp))
     end
 })
 
@@ -1471,7 +1493,7 @@ register_chatcommand('master', {
         if not alt_name or not master_name or alt_name:len() > 20 or master_name:len() > 20 then
             return false, 'Invalid arguments'
         end
-        local alt_id = data.get_player_id(alt_name)
+        local alt_id, true_alt_name = data.get_player_id(alt_name)
         local master_id = data.get_player_id(master_name)
         if not alt_id then
             return false, ('Unknown player %s'):format(alt_name)
@@ -1487,13 +1509,13 @@ register_chatcommand('master', {
         if status.id == data.player_status.banned.id then
             local alts = data.get_alts(true_master_id)
             for _, other_alt_name in ipairs(alts) do
-                local player = minetest.get_player_by_name(other_alt_name)
+                local player = get_player_by_name(other_alt_name)
                 if player then
                     util.safe_kick_player(caller, player, status.reason)
                 end
             end
         end
-        return true, ('Set master of %s to %s'):format(alt_name, true_master_name)
+        return true, ('Set master of %s to %s'):format(true_alt_name, true_master_name)
     end
 })
 
@@ -1526,7 +1548,7 @@ register_chatcommand('alts', {
     params      = '<player_name>',
     privs       = { [mod_priv] = true },
     func        = function(caller, player_name)
-        local alt_id = data.get_player_id(player_name)
+        local alt_id, player_name = data.get_player_id(player_name)
         if not alt_id then
             return false, 'Unknown or invalid player name'
         end
@@ -1590,7 +1612,7 @@ register_chatcommand('unflag', {
     params='<player_name>',
     privs={[mod_priv]=true},
     func=function(caller, player_name)
-        local player_id = data.get_player_id(player_name)
+        local player_id, player_name = data.get_player_id(player_name)
         if not player_id then
             return false, 'Unknown player'
         end

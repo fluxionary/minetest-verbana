@@ -1,4 +1,5 @@
 for commands that take a case-insentive username, we MUST print the actual username...
+* might be done, not tested
 
 add ip_temp_suspect and asn_temp_suspect commands
 
