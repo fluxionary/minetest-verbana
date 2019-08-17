@@ -860,7 +860,7 @@ register_chatcommand('asn_unblock', {
     end
 })
 ---------------- GET LOGS ---------------
-register_chatcommand('status', {
+register_chatcommand('player_status', {
     description='shows the status log of a player',
     params='<player_name> [<number>]',
     privs={[mod_priv]=true},
