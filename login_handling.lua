@@ -95,19 +95,40 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
 
     -- check and clear temporary statuses
     local now = os.time()
-    if player_status.id == data.player_status.banned.id and player_status.expires and now >= player_status.expires then
-        log('action', '[prejoin] expiring temp ban of %s', name)
-        data.set_player_status(player_id, player_status.executor_id, data.player_status.suspicious.id, 'temp ban expired')
+    if player_status.expires and now >= player_status.expires then
+        local prev_status_name = data.player_status_name[player_status.id]
+        log('action', '[prejoin] expiring temp %s of %s', prev_status_name, name)
+        local new_status_id
+        if player_status.id == data.player_status.suspicious.id then
+            new_status_id = data.player_status.default.id
+        else
+            new_status_id = data.player_status.suspicious.id
+        end
+        data.set_player_status(player_id, player_status.executor_id, new_status_id, ('temp %s expired'):format(prev_status_name))
         player_status = data.get_player_status(player_id) -- refresh player status
     end
-    if ip_status.id == data.ip_status.blocked.id and ip_status.expires and now >= ip_status.expires then
-        log('action', '[prejoin] expiring temp block of %s', ipstr)
-        data.set_ip_status(ipint, ip_status.executor_id, data.ip_status.suspicious.id, 'temp block expired')
+    if ip_status.expires and now >= ip_status.expires then
+        local prev_status_name = data.ip_status_name[ip_status.id]
+        log('action', '[prejoin] expiring temp %s of %s', prev_status_name, ipstr)
+        local new_status_id
+        if ip_status.id == data.ip_status.suspicious.id then
+            new_status_id = data.ip_status.default.id
+        else
+            new_status_id = data.ip_status.suspicious.id
+        end
+        data.set_ip_status(ipint, ip_status.executor_id, new_status_id, ('temp %s expired'):format(prev_status_name))
         ip_status = data.get_ip_status(ipint) -- refresh ip status
     end
-    if asn_status.id == data.asn_status.blocked.id and asn_status.expires and now >= asn_status.expires then
-        log('action', '[prejoin] expiring temp block of A%s', asn)
-        data.set_asn_status(asn, asn_status.executor_id, data.asn_status.suspicious.id, 'temp block expired')
+    if asn_status.expires and now >= asn_status.expires then
+        local prev_status_name = data.asn_status_name[asn_status.id]
+        log('action', '[prejoin] expiring temp %s of A%s', prev_status_name, asn)
+        local new_status_id
+        if asn_status.id == data.asn_status.suspicious.id then
+            new_status_id = data.asn_status.default.id
+        else
+            new_status_id = data.asn_status.suspicious.id
+        end
+        data.set_asn_status(asn, asn_status.executor_id, new_status_id, ('temp %s expired'):format(prev_status_name))
         asn_status = data.get_asn_status(asn) -- refresh asn status
     end
 
@@ -291,12 +312,12 @@ minetest.register_on_joinplayer(safe(function(player)
 
     if USING_VERIFICATION_JAIL then
         if should_rejail(player, player_status) then
-            log('action', 'rejailing %s', name)
+            log('action', 'spawning %s in verification jail', name)
             if not settings.debug_mode then
                 player:set_pos(unverified_spawn_pos)
             end
         elseif should_unjail(player, player_status) then
-            log('action', 'unjailing %s', name)
+            log('action', 'removing %s from verification jail on spawn', name)
             if not settings.debug_mode then
                 player:set_pos(spawn_pos)
             end
