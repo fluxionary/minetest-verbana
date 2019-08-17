@@ -1,8 +1,6 @@
 Verbana: Verification and banning mod for Minetest
 ==================================================
 
-CURRENTLY A NON-FUNCTIONAL WIP. DO NOT USE UNTIL THIS MESSAGE HAS BEEN REMOVED.
-
 Name
 ----
 A portmanteau of "verification", "ban", and the herb verbena.
@@ -10,7 +8,10 @@ A portmanteau of "verification", "ban", and the herb verbena.
 Terminology
 -----------
 
-The terms `network` and `ASN` are used interchangeably in this document.  
+The terms `network` and `ASN` are used interchangeably in this document. 
+
+The terms `player` and `account` are also used interchangeably in most contexts;
+sometimes `player` will refer to a physical person, however.
 
 Motivation
 ----------
@@ -297,63 +298,232 @@ banned, to quickly ban those accounts.
 An account can have only one master. A master account cannot have another account as its master;
 you can't chain the master/alt relationship.  
 
+
+Flagged accounts
+----------------
+
+Accounts that have been banned, kicked, unverified, or marked as suspicious retain a 
+separate "flagged" status, which is used to restrict the output of certain other
+commands. 
+
 Commands
 ========
 
+Arguments in angle brackets "<player_name>" are mandatory. Arguments in square brackets
+are optional e.g. "[\<filename>]". Some optional arguments have default values e.g.
+[\<timespan>=1w]. 
+
 # Administration
-sban_import  [<filename>]
-verification on | off
 
-# General status
-reports [<timespan>=1w]
-bans    [<number>=20]
-who2
+These commands are available only to administrators.
 
-# Player inspection
-pgrep      <pattern> [<limit>=20]
-asn        <player_name> | <IP>
-cluster    <player_name>
-status     <player_name> [<number>]
-inspect    <player_name>
-ban_record <player_name>
-logins     <player_name> [<number>=20]
+* sban_import [\<filename>]
 
-# Player management
-kick        <player_name> [<reason>]
-ban         <player_name> [<timespan>] [<reason>]
-unban       <player_name> [<reason>]
-suspect     <player_name> [<reason>]
-unsuspect   <player_name> [<reason>]
-verify      <player_name> [<reason>]
-unverify    <player_name> [<reason>]
-whitelist   <player_name> [<reason>]
-unwhitelist <player_name> [<reason>]
-master     <alt> <master>
-unmaster  <player_name>
+  Import data from the sban database. If no filename is specified, it looks for the
+  DB in its default location, $WORLD_ROOT/sban.sqlite 
 
-# IP inspection
-ip_inspect <IP> [<timespan>=1w]
-ip_status  <IP> [<number>]
+* verification on | off
 
-# IP management
-ip_block     <IP> [<timespan>] [<reason>]
-ip_unblock   <IP> [<reason>]
-ip_suspect   <IP> [<reason>]
-ip_unsuspect <IP> [<reason>]
-ip_trust     <IP> [<reason>]
-ip_untrust   <IP> [<reason>]
-
-# ASN inspection
-asn_inspect <ASN> [<timespan>=1w]
-asn_status  <ASN> [<number>]
-asn_stats   <ASN>
-
-# ASN management
-asn_block     <ASN> [<timespan>] [<reason>]
-asn_unblock   <ASN> [<reason>]
-asn_suspect   <ASN> [<reason>]
-asn_unsuspect <ASN> [<reason>]
+  Turn universal verification on or off. When universal verification is on,
+  all new players must be verified before they can interact with the server.
 
 # Available to all players
-report  <message>
-first-login <player_name>
+
+These commands are available to all players
+
+* report  <message>
+
+  Create a "report" that admins and moderators can read. Players
+  can use this to communicate problems to staff if staff is not currently
+  around.
+
+* first-login <player_name>
+
+  Get the original login date for an account. Corresponds to /last-login
+
+# General status
+
+General query commands for verbana staff.
+
+* reports [\<timespan>=1w]
+
+  Show recent reports.
+
+* bans    [\<number>=20]
+
+  Show recent bans.
+
+* who2
+
+  Show currently connected players, along with IPs, networks, and statuses.
+
+# Player inspection
+
+Commands for looking up info about a player or players. All 
+queries involving a player name are case-insensitive.
+
+* pgrep      <pattern> [\<limit>=20]
+
+  Search for player accounts that match a certain "pattern".
+  The pattern is a glob-type pattern, e.g. *flux* will search for any
+  player name containing the string "flux".
+
+* asn        <player_name> | <IP>
+
+  Look up the network of a player (currently connected or not) or
+  an IP.
+
+* cluster    <player_name>
+
+  Get a list of other player accounts that have used an IP that
+  the given player has used.
+
+* status     <player_name> [\<number>=20]
+
+  Get the most recent status changes for a player.
+
+* inspect    <player_name>
+
+  Get a list of IPs and networks associated with a player.
+
+* logins     <player_name> [\<number>=20]
+
+  View the most recent login info of a player.
+  
+* alts       <player_name>
+
+  List the registered alt accounts associated with a player. 
+
+* ban_record <player_name>
+
+  Get a summary of important information about a player, including
+  other accounts associated by IP, flagged accounts associated by network,
+  and their status log.
+
+# Player management
+
+Commands to change the status of a player.
+
+* kick        <player_name> [\<reason>]
+
+  Kick a player from the server. Kicks go into the player's status log,
+  but do not alter the player's status.
+
+* ban         <player_name> [\<timespan>] [\<reason>]
+
+  Ban a player. If a timespan is given e.g. 3d (three days) or 1w (one week) 
+  then the ban is temporary, and will expire after the given time. Banning
+  has the side effect of marking the most recently used IP of the player as suspicious.
+
+* unban       <player_name> [\<reason>]
+
+  Unban a player.
+
+* suspect     <player_name> [\<reason>]
+
+  Mark a player as suspicious. Suspicious players have the same privileges as
+  regular players, but certain actions e.g. logging in, are reported to 
+  verbana staff.  
+
+* unsuspect   <player_name> [\<reason>]
+
+  Remove a player's suspicious status.
+
+* verify      <player_name> [\<reason>]
+
+  Verify an unverified player.
+
+* unverify    <player_name> [\<reason>]
+
+  Reset a player's "unverified" status. This will revoke their ability to interact
+  or communicate with non-staff players. If a verification jail is defined, the player
+  will be returned to the verification jail.
+
+* whitelist   <player_name> [\<reason>]
+
+  An admin command. Mark a certain account as whitelisted, which allows
+  it to bypass the suspicious network checks at login.
+
+* unwhitelist <player_name> [\<reason>]
+
+  Remove a player's whitelisted status.
+
+* master     <alt> <master>
+
+  Associate an alt account with a master account. 
+
+* unmaster  <player_name>
+
+  Remove the associated master account for a given alt. 
+
+* unflag    <player_name>
+
+  Remove the "flag" from an account.
+
+# IP inspection
+
+* ip_inspect <IP> [\<timespan>=1w]
+
+  List players and statuses associated with an IP.
+
+* ip_status  <IP> [\<number>]
+
+  List the status of an IP.
+
+# IP management
+* ip_block     <IP> [\<timespan>] [\<reason>]
+
+  Block an IP, with an optional timespan. No connections from this IP will
+  be allowed.
+  
+* ip_unblock   <IP> [\<reason>]
+
+  Unblock an IP.
+
+* ip_suspect   <IP> [\<reason>]
+
+  Mark an IP as suspicious. New players connecting from this IP will
+  be forced to go through manual verification.
+
+* ip_unsuspect <IP> [\<reason>]
+
+  Remove the supicious status from an IP.
+
+* ip_trust     <IP> [\<reason>]
+
+  Mark an IP as trusted. Connections from a trusted IP that is part of a suspicious
+  network will bypass the suspicious network checks.
+
+* ip_untrust   <IP> [\<reason>]
+
+  Unmark an IP as suspicious.
+
+# ASN inspection
+* asn_inspect <ASN> [\<timespan>=1y]
+
+  Show flagged accounts associated with the network. 
+
+* asn_status  <ASN> [\<number>]
+
+  Show the status log for the network.
+
+* asn_stats   <ASN>
+
+  Show some statistics for the usage of the network.
+
+# ASN management
+* asn_block     <ASN> [\<timespan>] [\<reason>]
+
+  Block all connections from the network.
+
+* asn_unblock   <ASN> [\<reason>]
+
+  Unblock connections from the network.
+
+* asn_suspect   <ASN> [\<reason>]
+
+  Mark the network as suspicious.
+
+* asn_unsuspect <ASN> [\<reason>]
+
+  Unmark the network as suspicious.
