@@ -287,6 +287,7 @@ override_chatcommand('ban', {
         if not player_id then
             return false, reason
         end
+        local now = os.time()
         local timespan
         local expires
         if reason then
@@ -294,7 +295,7 @@ override_chatcommand('ban', {
             timespan = parse_timespan(first)
             if timespan then
                 reason = reason:sub(first:len() + 2)
-                expires = os.time() + timespan
+                expires = now + timespan
             end
         end
         if not table_contains({
@@ -304,7 +305,7 @@ override_chatcommand('ban', {
             }, player_status.id) then
             return false, ('Cannot ban %s w/ status %s'):format(player_name, player_status.name)
         end
-		local player = get_player_by_name(player_name)
+        local player = get_player_by_name(player_name)
         if player then
             safe_kick_player(caller, player, reason)
         end
@@ -313,7 +314,7 @@ override_chatcommand('ban', {
             return false, 'ERROR: could not get executor ID?'
         end
         if not data.set_player_status(player_id, executor_id, data.player_status.banned.id, reason, expires) then
-            return false, 'ERROR logging player status'
+            return false, 'ERROR setting player status'
         end
         if expires then
             if reason then
@@ -326,6 +327,24 @@ override_chatcommand('ban', {
                 log('action', '%s banned %s because %s', caller, player_name, reason)
             else
                 log('action', '%s banned %s', caller, player_name)
+            end
+        end
+        local ipstr = data.fumble_about_for_an_ip(player_name)
+		if ipstr then
+            local ipint = lib_ip.ipstr_to_ipint(ipstr)
+            local ip_status = data.get_ip_status(ipint)
+            if ip_status.name == data.ip_status.default.name then
+                -- mark the IP the player is on as suspicious
+                local ip_suspect_expires
+                if expires then
+                    ip_suspect_expires = expires
+                else
+                    ip_suspect_expires = now + parse_timespan('1w')
+                end
+                local ip_suspect_reason = ('Marked suspicious while banning %s'):format(player_name)
+                if not data.set_ip_status(ipint, executor_id, data.ip_status.suspicious.id, ip_suspect_reason, ip_suspect_expires) then
+                    return false, 'ERROR setting ip status'
+                end
             end
         end
         return true, ('Banned %s'):format(player_name)
