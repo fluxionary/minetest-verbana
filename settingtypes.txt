@@ -11,7 +11,7 @@ verbana.asn_data_path (Location of the ASN data file) string
 verbana.admin_priv (Priv required for Verbana administration) string ban_admin
 
 # The privilege of the Verbana moderator(s)
-verbana.moderator_priv (Priv required for Verbana moderation) string basic_privs
+verbana.moderator_priv (Priv required for Verbana moderation) string ban
 
 # Comma delimited
 verbana.unverified_privs (Privs for unverified users) string shout
