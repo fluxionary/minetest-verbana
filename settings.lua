@@ -58,7 +58,7 @@ verbana.settings.whitelisted_privs = minetest.string_to_privs(get_setting('verba
 if #verbana.settings.whitelisted_privs == 0 then verbana.settings.whitelisted_privs = nil end
 
 verbana.settings.spawn_pos = minetest.string_to_pos(get_setting('static_spawnpoint', '(0,0,0)'))
-verbana.settings.unverified_spawn_pos = minetest.string_to_pos(get_setting('verbana.unverified_spawn_pos', verbana.settings.spawn_pos))
+verbana.settings.unverified_spawn_pos = minetest.string_to_pos(get_setting('verbana.unverified_spawn_pos', minetest.pos_to_string(verbana.settings.spawn_pos)))
 
 verbana.settings.universal_verification = settings:get_bool('verbana.universal_verification', false)
 verbana.settings.jail_bounds = get_jail_bounds()
