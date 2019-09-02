@@ -333,7 +333,7 @@ override_chatcommand('ban', {
 		if ipstr then
             local ipint = lib_ip.ipstr_to_ipint(ipstr)
             local ip_status = data.get_ip_status(ipint)
-            if ip_status.name == data.ip_status.default.name then
+            if not ip_status or ip_status.name == data.ip_status.default.name then
                 -- mark the IP the player is on as suspicious
                 local ip_suspect_expires
                 if expires then
@@ -1351,7 +1351,7 @@ register_chatcommand('who2', {
 
             local ipstr = data.fumble_about_for_an_ip(name, player_id)
             local ipint = lib_ip.ipstr_to_ipint(ipstr)
-            local ip_status = data.get_ip_status(ipint)
+            local ip_status = data.get_ip_status(ipint) or data.ip_status.default
             local ip_status_color = data.ip_status_color[ip_status.id]
 
             local asn, asn_description = lib_asn.lookup(ipint)

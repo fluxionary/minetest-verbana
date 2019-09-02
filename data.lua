@@ -78,7 +78,7 @@ end
 local function prepare(code, description)
     if not check_description(description) then
         log('error', 'bad description for prepare: %q', tostring(description))
-        return false
+        return
     end
     local statement = db:prepare(code)
     if not statement then
@@ -144,29 +144,29 @@ local function get_full_table(code, description, ...)
         return false
     end
     local statement = prepare(code, description)
-    if not statement then return nil end
-    if not bind(statement, description, ...) then return nil end
+    if not statement then return end
+    if not bind(statement, description, ...) then return end
     local rows = {}
     for row in statement:rows() do
         table.insert(rows, row)
     end
-    if not finalize(statement, description) then return nil end
+    if not finalize(statement, description) then return end
     return rows
 end
 
 local function get_full_ntable(code, description, ...)
     if not check_description(description) then
         log('error', 'bad description for get_full_ntable: %q', tostring(description))
-        return false
+        return
     end
     local statement = prepare(code, description)
-    if not statement then return nil end
-    if not bind(statement, description, ...) then return nil end
+    if not statement then return end
+    if not bind(statement, description, ...) then return end
     local rows = {}
     for row in statement:nrows() do
         table.insert(rows, row)
     end
-    if not finalize(statement, description) then return nil end
+    if not finalize(statement, description) then return end
     return rows
 end
 
@@ -188,14 +188,14 @@ local function get_current_schema_version()
     local rows = get_full_ntable(code, 'does version table exist?', 'version')
     if not rows or #rows > 1 then
         log('error', 'error checking if version table exists')
-        return nil
+        return
     end -- ERROR
     if #rows == 0 then return 0 end -- if version table doesn't exist, assume DB is version 1
     code = [[SELECT version FROM version]]
     rows = get_full_ntable(code, 'get current version')
     if not rows or #rows ~= 1 then
         log('error', 'error querying version table')
-        return nil
+        return
     end -- ERROR
     return rows[1].version
 end
@@ -569,13 +569,13 @@ function data.get_ip_status(ipint, create_if_new)
         return table[1]
     elseif #table > 1 then
         log('error', 'somehow got more than 1 result when getting current ip status for %s', ipint)
-        return nil
+        return
     elseif not create_if_new then
-        return nil
+        return
     end
     if not data.set_ip_status(ipint, data.verbana_player_id, data.ip_status.default.id, 'creating initial ip status') then
         log('error', 'failed to set initial ip status')
-        return nil
+        return
     end
     return data.get_ip_status(ipint, false)
 end
@@ -623,13 +623,13 @@ function data.get_asn_status(asn, create_if_new)
         return table[1]
     elseif #table > 1 then
         log('error', 'somehow got more than 1 result when getting current asn status for %s', asn)
-        return nil
+        return
     elseif not create_if_new then
-        return nil
+        return
     end
     if not data.set_asn_status(asn, data.verbana_player_id, data.asn_status.default.id, 'creating initial asn status') then
         log('error', 'failed to set initial asn status')
-        return nil
+        return
     end
     return data.get_asn_status(asn, false)
 end
