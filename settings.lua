@@ -1,11 +1,10 @@
 verbana.settings = {}
 
-local settings = minetest.settings
 local world_path = minetest.get_worldpath()
 
 function verbana.settings.set_universal_verification(value)
     if type(value) == 'boolean' then
-        settings:set_bool('verbana.universal_verification', value)
+        minetest.settings:set_bool('verbana.universal_verification', value)
         verbana.settings.universal_verification = value
     else
         verbana.log('error', 'tried to set universal verification to %q', value)
@@ -13,7 +12,7 @@ function verbana.settings.set_universal_verification(value)
 end
 
 local function get_setting(name, default)
-    local setting = settings:get(name)
+    local setting = minetest.settings:get(name)
     if not setting or setting == '' then
         return default
     end
@@ -22,7 +21,7 @@ end
 
 local function get_jail_bounds()
     -- (x1,y1,z1),(x2,y2,z2)
-    local bounds = settings:get('verbana.jail_bounds')
+    local bounds = minetest.settings:get('verbana.jail_bounds')
     if not bounds or bounds == '' then
         return nil
     end
@@ -60,7 +59,7 @@ if #verbana.settings.whitelisted_privs == 0 then verbana.settings.whitelisted_pr
 verbana.settings.spawn_pos = minetest.string_to_pos(get_setting('static_spawnpoint', '(0,0,0)'))
 verbana.settings.unverified_spawn_pos = minetest.string_to_pos(get_setting('verbana.unverified_spawn_pos', minetest.pos_to_string(verbana.settings.spawn_pos)))
 
-verbana.settings.universal_verification = settings:get_bool('verbana.universal_verification', false)
+verbana.settings.universal_verification = minetest.settings:get_bool('verbana.universal_verification', false)
 verbana.settings.jail_bounds = get_jail_bounds()
 verbana.settings.jail_check_period = tonumber(get_setting('verbana.jail_check_period'))
 

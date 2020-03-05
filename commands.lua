@@ -18,15 +18,10 @@ local table_contains        = util.table_contains
 local iso_date              = util.iso_date
 
 local worldpath             = minetest.get_worldpath()
-local colorize              = minetest.colorize
-local get_player_by_name    = minetest.get_player_by_name
-local set_player_privs      = minetest.set_player_privs
-local mt_chat_send_player   = minetest.chat_send_player
-local get_connected_players = minetest.get_connected_players
 
 local function chat_send_player(name, message, ...)
     message = message:format(...)
-    mt_chat_send_player(name, message)
+    minetest.chat_send_player(name, message)
 end
 
 local function register_chatcommand(name, def)
@@ -188,9 +183,9 @@ register_chatcommand('verify', {
         end
         log('action', 'setting verified privs for %s', player_name)
         if not debug_mode then
-            set_player_privs(player_name, settings.verified_privs)
+            minetest.set_player_privs(player_name, settings.verified_privs)
         end
-        local player = get_player_by_name(player_name)
+        local player = minetest.get_player_by_name(player_name)
         if player then
             log('action', 'moving %s to spawn', player_name)
             if not debug_mode then
@@ -230,9 +225,9 @@ register_chatcommand('unverify', {
         end
         log('action', 'setting unverified privs for %s', player_name)
         if not debug_mode then
-            set_player_privs(player_name, settings.unverified_privs)
+            minetest.set_player_privs(player_name, settings.unverified_privs)
         end
-        local player = get_player_by_name(player_name)
+        local player = minetest.get_player_by_name(player_name)
         if player then
             log('action', 'moving %s to unverified area', player_name)
             if not debug_mode then
@@ -257,7 +252,7 @@ override_chatcommand('kick', {
         if not player_id then
             return false, reason
         end
-		local player = get_player_by_name(player_name)
+		local player = minetest.get_player_by_name(player_name)
 		if not player then
 			return false, ("Player %s not in game!"):format(player_name)
         end
@@ -305,7 +300,7 @@ override_chatcommand('ban', {
             }, player_status.id) then
             return false, ('Cannot ban %s w/ status %s'):format(player_name, player_status.name)
         end
-        local player = get_player_by_name(player_name)
+        local player = minetest.get_player_by_name(player_name)
         if player then
             safe_kick_player(caller, player, reason)
         end
@@ -898,7 +893,7 @@ register_chatcommand('player_status', {
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                colorize(status_color, status_name)
+                minetest.colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -940,7 +935,7 @@ register_chatcommand('ban_record', {
             local clustered = {}
             for _, row in ipairs(rows) do
                 local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
-                table.insert(clustered, colorize(color, row.player_name))
+                table.insert(clustered, minetest.colorize(color, row.player_name))
             end
             chat_send_player(caller, "Accounts associated by IP:")
             chat_send_player(caller, table.concat(clustered, ', '))
@@ -952,7 +947,7 @@ register_chatcommand('ban_record', {
             local assocs = {}
             for _, row in ipairs(rows) do
                 local color = data.player_status_color[row.player_status_id] or data.player_status.default.color
-                table.insert(assocs, colorize(color, row.player_name))
+                table.insert(assocs, minetest.colorize(color, row.player_name))
             end
             chat_send_player(caller, "Flagged accounts on A%s (%s):", asn, asn_description)
             chat_send_player(caller, table.concat(assocs, ', '))
@@ -972,7 +967,7 @@ register_chatcommand('ban_record', {
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                colorize(status_color, status_name)
+                minetest.colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -1022,7 +1017,7 @@ register_chatcommand('ip_status', {
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                colorize(status_color, status_name)
+                minetest.colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -1072,7 +1067,7 @@ register_chatcommand('asn_status', {
             local message = ('%s: %s set status to %s.'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                colorize(status_color, status_name)
+                minetest.colorize(status_color, status_name)
             )
             local reason = row.reason
             if reason and reason ~= '' then
@@ -1126,11 +1121,11 @@ register_chatcommand('logins', {
                 '%s:%s from %s<%s> A%s<%s> (%s)',
                 iso_date(row.timestamp),
                 (row.success and '') or ' failed!',
-                colorize(ip_status_color, lib_ip.ipint_to_ipstr(row.ipint)),
-                colorize(ip_status_color, ip_status_name),
-                colorize(asn_status_color, row.asn),
-                colorize(asn_status_color, asn_status_name),
-                colorize(asn_status_color, asn_description)
+                minetest.colorize(ip_status_color, lib_ip.ipint_to_ipstr(row.ipint)),
+                minetest.colorize(ip_status_color, ip_status_name),
+                minetest.colorize(asn_status_color, row.asn),
+                minetest.colorize(asn_status_color, asn_status_name),
+                minetest.colorize(asn_status_color, asn_description)
             )
         end
         return true
@@ -1168,11 +1163,11 @@ register_chatcommand('inspect', {
             chat_send_player(
                 caller,
                 '%s<%s> A%s (%s) <%s>',
-                colorize(ip_status_color, ipstr),
-                colorize(ip_status_color, ip_status_name),
-                colorize(asn_status_color, row.asn),
-                colorize(asn_status_color, asn_description),
-                colorize(asn_status_color, asn_status_name)
+                minetest.colorize(ip_status_color, ipstr),
+                minetest.colorize(ip_status_color, ip_status_name),
+                minetest.colorize(asn_status_color, row.asn),
+                minetest.colorize(asn_status_color, asn_description),
+                minetest.colorize(asn_status_color, asn_status_name)
             )
         end
         return true
@@ -1214,7 +1209,7 @@ register_chatcommand('ip_inspect', {
             local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
             local message = ('% 20s: %s'):format(
                 row.player_name,
-                colorize(status_color, status_name)
+                minetest.colorize(status_color, status_name)
             )
             chat_send_player(caller, message)
         end
@@ -1259,7 +1254,7 @@ register_chatcommand('asn_inspect', {
             local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
             local message = ('% 20s: %s (last IP: %s)'):format(
                 row.player_name,
-                colorize(status_color, status_name),
+                minetest.colorize(status_color, status_name),
                 lib_ip.ipint_to_ipstr(row.ipint)
             )
             chat_send_player(caller, message)
@@ -1290,7 +1285,7 @@ register_chatcommand('asn_stats', {
             local status_name = data.player_status_name[row.player_status_id] or data.player_status.default.name
             local status_color = data.player_status_color[row.player_status_id] or data.player_status.default.color
             chat_send_player(caller, ('%s %s'):format(
-                colorize(status_color, status_name),
+                minetest.colorize(status_color, status_name),
                 row.count
             ))
         end
@@ -1327,7 +1322,7 @@ register_chatcommand('cluster', {
                 caller,
                 '% 20s: %s',
                 row.player_name,
-                colorize(status_color, status_name)
+                minetest.colorize(status_color, status_name)
             )
         end
         return true
@@ -1340,7 +1335,7 @@ register_chatcommand('who2', {
     privs={[mod_priv]=true},
     func=function(caller)
         local names = {}
-        for _, player in ipairs(get_connected_players()) do
+        for _, player in ipairs(minetest.get_connected_players()) do
             table.insert(names, player:get_player_name())
         end
         table.sort(names, function(a, b) return a:lower() < b:lower() end)
@@ -1359,13 +1354,13 @@ register_chatcommand('who2', {
             local asn_status_color = data.asn_status_color[asn_status.id]
 
             local message = ('% 20s<%s> %s<%s> A%s<%s> (%s)'):format(
-                colorize(player_status_color, name),
-                colorize(player_status_color, player_status.name),
-                colorize(ip_status_color, ipstr),
-                colorize(ip_status_color, ip_status.name),
-                colorize(asn_status_color, asn),
-                colorize(asn_status_color, asn_status.name),
-                colorize(asn_status_color, asn_description)
+                minetest.colorize(player_status_color, name),
+                minetest.colorize(player_status_color, player_status.name),
+                minetest.colorize(ip_status_color, ipstr),
+                minetest.colorize(ip_status_color, ip_status.name),
+                minetest.colorize(asn_status_color, asn),
+                minetest.colorize(asn_status_color, asn_status.name),
+                minetest.colorize(asn_status_color, asn_description)
             )
             chat_send_player(caller, message)
         end
@@ -1402,7 +1397,7 @@ register_chatcommand('bans', {
             local message = ('%s: %s %s %s'):format(
                 iso_date(row.timestamp),
                 row.executor_name,
-                colorize(status_color, status_name),
+                minetest.colorize(status_color, status_name),
                 row.player_name
             )
             if row.expires then
@@ -1528,7 +1523,7 @@ register_chatcommand('master', {
         if status.id == data.player_status.banned.id then
             local alts = data.get_alts(true_master_id)
             for _, other_alt_name in ipairs(alts) do
-                local player = get_player_by_name(other_alt_name)
+                local player = minetest.get_player_by_name(other_alt_name)
                 if player then
                     util.safe_kick_player(caller, player, status.reason)
                 end
@@ -1616,7 +1611,7 @@ register_chatcommand('pgrep', {
             local asn_description = (row.asn and lib_asn.get_description(row.asn)) or ''
             chat_send_player(caller, '%s %s %s %s (%s)',
                 row.name,
-                colorize(status_color, status_name),
+                minetest.colorize(status_color, status_name),
                 ipstr,
                 asn,
                 asn_description

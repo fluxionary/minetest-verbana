@@ -15,8 +15,6 @@ local jail_bounds             = settings.jail_bounds
 local jail_check_period       = settings.jail_check_period
 local USING_VERIFICATION_JAIL = jail_bounds and jail_check_period
 
-local check_player_privs      = minetest.check_player_privs
-
 local function should_rejail(player, player_status)
     if player_status.id ~= data.player_status.unverified.id then
         return false
@@ -155,7 +153,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     elseif player_status.id == data.player_status.whitelisted.id then
         -- if the player is whitelisted, let them in.
         log('action', '[prejoin] %s is whitelisted', name)
-    elseif settings.whitelisted_privs and check_player_privs(name, settings.whitelisted_privs) then
+    elseif settings.whitelisted_privs and minetest.check_player_privs(name, settings.whitelisted_privs) then
         -- if the player has a whitelisted priv, let them in.
         log('action', '[prejoin] %s whitelisted by privs', name)
     elseif ip_status.id == data.ip_status.trusted.id then
