@@ -22,6 +22,13 @@ local worldpath             = minetest.get_worldpath()
 local function chat_send_player(name, message, ...)
     message = message:format(...)
     minetest.chat_send_player(name, message)
+    local irc_message = minetest.strip_colors(message)
+    if minetest.global_exists('irc') and irc.joined_players[name] then
+        irc.say(name, irc_message)
+    end
+    if minetest.global_exists('irc2') and irc2.joined_players[name] then
+        irc2.say(name, irc_message)
+    end
 end
 
 local function register_chatcommand(name, def)
