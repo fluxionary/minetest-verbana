@@ -219,7 +219,7 @@ minetest.register_on_prejoinplayer(safe(function(name, ipstr)
     else
         log('action', 'Connection of %s from %s (A%s) allowed', name, ipstr, asn)
         data.log(player_id, ipint, asn, true)
-        data.assoc(player_id, ipint, asn)
+        -- don't log associations here, because the login may still fail due to an invalid password
     end
 end))
 
@@ -290,6 +290,11 @@ minetest.register_on_joinplayer(safe(function(player)
     local player_status = data.get_player_status(player_id)
     local is_unverified = player_status.id == data.player_status.unverified.id
     local ipstr = data.fumble_about_for_an_ip(name)
+
+    local ipint = lib_ip.ipstr_to_ipint(ipstr)
+    local asn, _ = lib_asn.lookup(ipint)
+    data.assoc(player_id, ipint, asn)
+
     if is_unverified then
         if ipstr then
             local ipint = lib_ip.ipstr_to_ipint(ipstr)
