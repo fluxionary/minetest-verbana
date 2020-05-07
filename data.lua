@@ -974,7 +974,7 @@ function data.get_ban_log(limit)
           FROM player_status_log
           JOIN player          ON player.id        == player_status_log.player_id
           JOIN player executor ON executor.id      == player_status_log.executor_id
-         WHERE player.id != (?)
+         WHERE executor.id != ?
          ORDER BY player_status_log.timestamp DESC
          LIMIT ?
     ]]
