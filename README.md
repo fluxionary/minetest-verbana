@@ -84,7 +84,7 @@ the Blocky Survival server to connect to a second IRC server.
 Sban and verification are also listed as optional dependencies, but this is primarily
 in order for verbana to detect their presence. By default, verbana will run in 
 "debug mode" if these mods are detected. If you wish to use verbana as intended, you do
-*not* want these mods installed.
+\*not\* want these mods installed.
 
 Installation
 ============
@@ -317,10 +317,10 @@ are optional e.g. "[\<filename>]". Some optional arguments have default values e
 
 These commands are available only to administrators.
 
-* sban_import [\<filename>]
+* sban\_import [\<filename>]
 
   Import data from the sban database. If no filename is specified, it looks for the
-  DB in its default location, $WORLD_ROOT/sban.sqlite 
+  DB in its default location, $WORLD\_ROOT/sban.sqlite 
 
 * verification on | off
 
@@ -362,13 +362,13 @@ General query commands for verbana staff.
 Commands for looking up info about a player or players. All 
 queries involving a player name are case-insensitive.
 
-* pgrep      <pattern> [\<limit>=20]
+* pgrep      \<pattern\> [\<limit\>=20]
 
   Search for player accounts that match a certain "pattern".
   The pattern is a glob-type pattern, e.g. *flux* will search for any
   player name containing the string "flux".
 
-* asn        <player_name> | <IP>
+* asn        \<player\_name\> | \<IP\>
 
   Look up the network of a player (currently connected or not) or
   an IP.
@@ -394,7 +394,7 @@ queries involving a player name are case-insensitive.
 
   List the registered alt accounts associated with a player. 
 
-* ban_record <player_name>
+* ban\_record <player_name>
 
   Get a summary of important information about a player, including
   other accounts associated by IP, flagged accounts associated by network,
