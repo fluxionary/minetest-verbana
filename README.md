@@ -309,15 +309,15 @@ commands.
 Commands
 ========
 
-Arguments in angle brackets "<player_name>" are mandatory. Arguments in square brackets
-are optional e.g. "[\<filename>]". Some optional arguments have default values e.g.
-[\<timespan>=1w]. 
+Arguments in angle brackets "\<player\_name\>" are mandatory. Arguments in square brackets
+are optional e.g. "[\<filename\>]". Some optional arguments have default values e.g.
+[\<timespan\>=1w]. 
 
 # Administration
 
 These commands are available only to administrators.
 
-* sban\_import [\<filename>]
+* sban\_import [\<filename\>]
 
   Import data from the sban database. If no filename is specified, it looks for the
   DB in its default location, $WORLD\_ROOT/sban.sqlite 
@@ -331,13 +331,13 @@ These commands are available only to administrators.
 
 These commands are available to all players
 
-* report  <message>
+* report  \<message\>
 
   Create a "report" that admins and moderators can read. Players
   can use this to communicate problems to staff if staff is not currently
   around.
 
-* first-login <player_name>
+* first-login \<player\_name\>
 
   Get the original login date for an account. Corresponds to /last-login
 
@@ -345,11 +345,11 @@ These commands are available to all players
 
 General query commands for verbana staff.
 
-* reports [\<timespan>=1w]
+* reports [\<timespan\>=1w]
 
   Show recent reports.
 
-* bans    [\<number>=20]
+* bans    [\<number\>=20]
 
   Show recent bans.
 
@@ -373,28 +373,28 @@ queries involving a player name are case-insensitive.
   Look up the network of a player (currently connected or not) or
   an IP.
 
-* cluster    <player_name>
+* cluster    \<player\_name\>
 
   Get a list of other player accounts that have used an IP that
   the given player has used.
 
-* status     <player_name> [\<number>=20]
+* status     \<player\_name\> [\<number\>=20]
 
   Get the most recent status changes for a player.
 
-* inspect    <player_name>
+* inspect    \<player\_name\>
 
   Get a list of IPs and networks associated with a player.
 
-* logins     <player_name> [\<number>=20]
+* logins     \<player\_name\> [\<number\>=20]
 
   View the most recent login info of a player.
   
-* alts       <player_name>
+* alts       \<player\_name\>
 
   List the registered alt accounts associated with a player. 
 
-* ban\_record <player_name>
+* ban\_record \<player\_name\>
 
   Get a summary of important information about a player, including
   other accounts associated by IP, flagged accounts associated by network,
@@ -404,126 +404,126 @@ queries involving a player name are case-insensitive.
 
 Commands to change the status of a player.
 
-* kick        <player_name> [\<reason>]
+* kick        \<player\_name\> [\<reason\>]
 
   Kick a player from the server. Kicks go into the player's status log,
   but do not alter the player's status.
 
-* ban         <player_name> [\<timespan>] [\<reason>]
+* ban         \<player\_name\> [\<timespan\>] [\<reason\>]
 
   Ban a player. If a timespan is given e.g. 3d (three days) or 1w (one week) 
   then the ban is temporary, and will expire after the given time. Banning
   has the side effect of marking the most recently used IP of the player as suspicious.
 
-* unban       <player_name> [\<reason>]
+* unban       \<player\_name\> [\<reason\>]
 
   Unban a player.
 
-* suspect     <player_name> [\<reason>]
+* suspect     \<player\_name\> [\<reason\>]
 
   Mark a player as suspicious. Suspicious players have the same privileges as
   regular players, but certain actions e.g. logging in, are reported to 
   verbana staff.  
 
-* unsuspect   <player_name> [\<reason>]
+* unsuspect   \<player\_name\> [\<reason\>]
 
   Remove a player's suspicious status.
 
-* verify      <player_name> [\<reason>]
+* verify      \<player\_name\> [\<reason\>]
 
   Verify an unverified player.
 
-* unverify    <player_name> [\<reason>]
+* unverify    \<player\_name\> [\<reason\>]
 
   Reset a player's "unverified" status. This will revoke their ability to interact
   or communicate with non-staff players. If a verification jail is defined, the player
   will be returned to the verification jail.
 
-* whitelist   <player_name> [\<reason>]
+* whitelist   \<player\_name\> [\<reason\>]
 
   An admin command. Mark a certain account as whitelisted, which allows
   it to bypass the suspicious network checks at login.
 
-* unwhitelist <player_name> [\<reason>]
+* unwhitelist \<player\_name\> [\<reason\>]
 
   Remove a player's whitelisted status.
 
-* master     <alt> <master>
+* master     \<alt\> \<master\>
 
   Associate an alt account with a master account. 
 
-* unmaster  <player_name>
+* unmaster  \<player\_name\>
 
   Remove the associated master account for a given alt. 
 
-* unflag    <player_name>
+* unflag    \<player\_name\>
 
   Remove the "flag" from an account.
 
 # IP inspection
 
-* ip_inspect <IP> [\<timespan>=1w]
+* ip\_inspect \<IP\> [\<timespan\>=1w]
 
   List players and statuses associated with an IP.
 
-* ip_status  <IP> [\<number>]
+* ip\_status  \<IP\> [\<number\>]
 
   List the status of an IP.
 
 # IP management
-* ip_block     <IP> [\<timespan>] [\<reason>]
+* ip\_block     \<IP\> [\<timespan\>] [\<reason\>]
 
   Block an IP, with an optional timespan. No connections from this IP will
   be allowed.
   
-* ip_unblock   <IP> [\<reason>]
+* ip\_unblock   \<IP\> [\<reason\>]
 
   Unblock an IP.
 
-* ip_suspect   <IP> [\<reason>]
+* ip\_suspect   \<IP\> [\<reason\>]
 
   Mark an IP as suspicious. New players connecting from this IP will
   be forced to go through manual verification.
 
-* ip_unsuspect <IP> [\<reason>]
+* ip\_unsuspect \<IP\> [\<reason\>]
 
   Remove the supicious status from an IP.
 
-* ip_trust     <IP> [\<reason>]
+* ip\_trust     \<IP\> [\<reason\>]
 
   Mark an IP as trusted. Connections from a trusted IP that is part of a suspicious
   network will bypass the suspicious network checks.
 
-* ip_untrust   <IP> [\<reason>]
+* ip\_untrust   \<IP\> [\<reason\>]
 
   Unmark an IP as suspicious.
 
 # ASN inspection
-* asn_inspect <ASN> [\<timespan>=1y]
+* asn\_inspect \<ASN\> [\<timespan\>=1y]
 
   Show flagged accounts associated with the network. 
 
-* asn_status  <ASN> [\<number>]
+* asn\_status  \<ASN\> [\<number\>]
 
   Show the status log for the network.
 
-* asn_stats   <ASN>
+* asn\_stats   \<ASN\>
 
   Show some statistics for the usage of the network.
 
 # ASN management
-* asn_block     <ASN> [\<timespan>] [\<reason>]
+* asn\_block     \<ASN\> [\<timespan\>] [\<reason\>]
 
   Block all connections from the network.
 
-* asn_unblock   <ASN> [\<reason>]
+* asn\_unblock   \<ASN\> [\<reason\>]
 
   Unblock connections from the network.
 
-* asn_suspect   <ASN> [\<reason>]
+* asn\_suspect   \<ASN\> [\<reason\>]
 
   Mark the network as suspicious.
 
-* asn_unsuspect <ASN> [\<reason>]
+* asn\_unsuspect \<ASN\> [\<reason\>]
 
   Unmark the network as suspicious.
