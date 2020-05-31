@@ -448,6 +448,8 @@ Commands to change the status of a player.
 
   Remove a player's whitelisted status.
 
+## Managing account clusters
+
 * master     \<alt\> \<master\>
 
   Associate an alt account with a master account. 
