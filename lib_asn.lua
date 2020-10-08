@@ -95,7 +95,7 @@ function verbana.lib_asn.refresh()
 end
 
 if not verbana.lib_asn.refresh() then
-    error('Verbana could not load ASN data')
+    error('Verbana could not load ASN data. Please see README.md for instructions.')
 end
 
 local function find(ipint)
