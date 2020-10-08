@@ -65,10 +65,11 @@ verbana.settings.jail_check_period = tonumber(get_setting('verbana.jail_check_pe
 
 local debug_is_default -- we revert to debug mode if verification or sban is enabled
 if ((
-        minetest.get_modpath('sban') and
-        minetest.registered_chatcommands['bang'] -- sban doesn't publish an API, so use this as a proxy
+        minetest.get_modpath('sban')
     ) or (
-        minetest.global_exists('verification')
+        minetest.get_modpath('verification')
+    ) or (
+        minetest.get_modpath('xban2')
     )) then
     debug_is_default = 'true'
 else
