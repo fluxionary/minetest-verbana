@@ -1,6 +1,8 @@
 Verbana: Verification and banning mod for Minetest
 ==================================================
 
+Copyright flux 2021 AGPLv3
+
 Name
 ----
 A portmanteau of "verification", "ban", and the herb verbena.
