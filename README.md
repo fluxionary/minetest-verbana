@@ -147,8 +147,14 @@ file.
 
 * `verbana.moderator_priv`
 
-  The privilege needed to administer verbana. Defaults to `basic_privs`. This privilege will
-  be created if it does not currently exist.
+  The privilege needed to use verbana for moderation. Defaults to `ban`. 
+  This privilege will be created if it does not currently exist.
+
+* `verbana.kick_priv`
+
+  The privilege needed to kick users. By default, the moderator privilege will be used. If
+  you want a separate privilege just for kicking, you can set this value. Usually you'll want
+  to give it the value "kick".
 
 * `verbana.unverified_privs`
 
