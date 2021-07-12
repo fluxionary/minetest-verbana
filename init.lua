@@ -55,6 +55,8 @@ end))
 dofile(verbana.modpath .. '/data.lua') -- data must go first
 dofile(verbana.modpath .. '/chat.lua') -- chat must go before login_handling
 dofile(verbana.modpath .. '/login_handling.lua')
+dofile(verbana.modpath .. '/imports/sban.lua') -- must go before commands
+dofile(verbana.modpath .. '/imports/xban.lua') -- must go before commands
 dofile(verbana.modpath .. '/commands.lua')
 
 -- cleanup (prevent access to insecure environment from any outside mod, or in-game)
