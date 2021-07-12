@@ -50,6 +50,7 @@ verbana.settings.asn_data_path = get_setting('verbana.asn_data_path', ('%s/data-
 
 verbana.settings.admin_priv = get_setting('verbana.admin_priv', 'ban_admin')
 verbana.settings.moderator_priv = get_setting('verbana.moderator_priv', 'ban')
+verbana.settings.kick_priv = get_setting('verbana.kick_priv', nil)
 
 verbana.settings.verified_privs = minetest.string_to_privs(get_setting('default_privs', 'shout,interact'))
 verbana.settings.unverified_privs = minetest.string_to_privs(get_setting('verbana.unverified_privs', 'shout'))

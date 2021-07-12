@@ -9,6 +9,7 @@ local util                  = verbana.util
 
 local mod_priv              = verbana.privs.moderator
 local admin_priv            = verbana.privs.admin
+local kick_priv             = verbana.privs.kick
 local debug_mode            = settings.debug_mode
 
 local parse_timespan        = util.parse_timespan
@@ -250,11 +251,22 @@ register_chatcommand('unverify', {
     end
 })
 
+local kick_privs = {[mod_priv]=true}
+if kick_priv and kick_priv ~= mod_priv then
+    kick_privs = nil
+end
+
 override_chatcommand('kick', {
     description='Kick a player',
     params='<player_name> [<reason>]',
-    privs={[mod_priv]=true},
+    privs=kick_privs or {},
     func=function(caller, params)
+        if not kick_privs then
+            if not (minetest.check_player_privs(caller, {[mod_priv]=true}) or
+                    minetest.check_player_privs(caller, {[kick_priv]=true})) then
+                return false, "You lack sufficient privileges to run this command"
+            end
+        end
         local player_id, player_name, _, reason = parse_player_status_params(params)
         if not player_id then
             return false, reason

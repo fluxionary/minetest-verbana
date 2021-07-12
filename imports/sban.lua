@@ -1,4 +1,4 @@
-verbana.data.import = verbana.data.import or {}
+verbana.import = verbana.import or {}
 verbana.import.sban = {}
 local _sban = {}
 
@@ -153,4 +153,4 @@ function _sban.import(filename)
     end
     log('action', 'imported from SBAN in %s seconds', os.clock() - start)
     return true
-end -- data.import_from_sban
+end -- import_from_sban

@@ -13,6 +13,9 @@ verbana.admin_priv (Priv required for Verbana administration) string ban_admin
 # The privilege of the Verbana moderator(s)
 verbana.moderator_priv (Priv required for Verbana moderation) string ban
 
+# A privilege for the "kick" command, if needed
+verbana.kick_priv (additional priv for "kick" command) string
+
 # Comma delimited
 verbana.unverified_privs (Privs for unverified users) string shout
 
