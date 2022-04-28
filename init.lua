@@ -69,7 +69,10 @@ verbana.ie = {
     imath = assert(ie.require("imath"), "Verbana will not function without limath. See README.md"),
     sqlite = ie.require("lsqlite3"),
     pgsql = assert(ie.require("pgsql"), "Verbana will not function without pgsql. See README.md"),
-    http_api = verbana.assert_warn(minetest.request_http_api(), "Verbana will automatically update network information without http access. See README.md"),
+    http_api = verbana.assert_warn(minetest.request_http_api(),
+        "Verbana cannot automatically update network information without http access. See README.md"),
+    iconv = verbana.assert_warn(ie.require("liconv"),
+        "Verbana cannot automatically update network information without iconv. See README.md"),
 }
 
 ie = nil -- nuke this as quickly as possible

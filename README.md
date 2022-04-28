@@ -72,6 +72,7 @@ Requirements
 * https://luarocks.org/modules/edubart/limath
 * https://luarocks.org/modules/dougcurrie/lsqlite3
 * https://luarocks.org/modules/mbalmer/luapgsql
+* https://luarocks.org/modules/luarocks/lua-iconv
 
 Optional Dependencies
 ---------------------
