@@ -18,7 +18,7 @@ sometimes `player` will refer to a physical person, however.
 Motivation
 ----------
 
-This mod is a response to sban, an IP-aware banning mod derived from xban,
+This mod is a response to sban (an IP-aware banning mod derived from xban),
 and BillyS's verification mod for Blocky Survival. Both of these mods have
 problems that I've long wanted to resolve, and it seemed the best resolution
 to those problems was to create a new integrating the features of both.
@@ -67,15 +67,11 @@ Requirements
 ============
 
 * Minetest 5.0 or later.
-* Verbana must be listed as a trusted mod in minetest.conf (`secure.trusted_mods`), 
-  in order to use a sqlite database.
-* lsqlite3 (SQLite3 for Lua) must be installed and accessible to Minetest's Lua.
- * The easiest way I know how to do this: install luarocks, and execute 
-   `luarocks --lua-version 5.1 install lsqlite3` or the appropriate variation. 
-* The Minetest server must use IPv4 exclusively. I've made zero attempt to support 
-  IPv6. 
-* There's some soft dependencies on linux. Windows users may need to make some changes,
-  which I would gladly accept as a PR.
+* Verbana must be listed as a trusted mod in minetest.conf (`secure.trusted_mods`)
+* https://luarocks.org/modules/hisham/luafilesystem
+* https://luarocks.org/modules/edubart/limath
+* https://luarocks.org/modules/dougcurrie/lsqlite3
+* https://luarocks.org/modules/mbalmer/luapgsql
 
 Optional Dependencies
 ---------------------
@@ -83,7 +79,7 @@ Optional Dependencies
 Verbana can make use of the stock IRC mod, as well as the "IRC2" mod that is used on
 the Blocky Survival server to connect to a second IRC server. 
 
-Sban and verification are also listed as optional dependencies, but this is primarily
+Sban, xban, xban2, and verification are also listed as optional dependencies, but this is primarily
 in order for verbana to detect their presence. By default, verbana will run in 
 "debug mode" if these mods are detected. If you wish to use verbana as intended, you do
 \*not\* want these mods installed.
@@ -104,10 +100,14 @@ minetest.conf:
 secure.trusted_mods = verbana
 ``` 
 
-The only "trusted" thing verbana does is load lsqlite so that it can interact with
-its database. To our knowledge, verbana cannot leak the insecure environment, but 
-it can leak the lsqlite interface in minetest 5.0.1 and development versions before
-commit ecd20de. 
+The only "trusted" thing verbana does is load lua modles so that it can interact with
+its database. To our knowledge, verbana cannot leak the insecure environment.
+
+Verbana also needs to have http access, in order to update the ASN databases. Verbana will not send your data
+anywhere else. 
+```
+secure.http_mods = verbana
+```
 
 Download ASN tables
 -------------------

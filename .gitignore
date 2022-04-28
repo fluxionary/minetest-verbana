@@ -1,5 +1,6 @@
 .idea/
-/data-raw-table
-/data-used-autnums
+/data/data-raw-table
+/data/data-used-autnums
+/data/ipv6-raw-table
 *.sqlite
 *.sqlite3

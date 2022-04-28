@@ -1,65 +1,87 @@
-verbana = {}
-verbana.version = '0.1.0'
 local modname = minetest.get_current_modname()
-verbana.modname = modname
-verbana.modpath = minetest.get_modpath(modname)
+local modpath = minetest.get_modpath(modname)
 
-function verbana.log(level, message, ...)
-    message = message:format(...)
-    minetest.log(level, ('[%s] %s'):format(modname, message))
-end
+verbana = {
+    version = "20220418.0",
+    modname = modname,
+    modpath = modpath,
+
+    has = {
+        irc = minetest.get_modpath("irc"),
+        irc2 = minetest.get_modpath("irc2"),
+        sban = minetest.get_modpath("sban"),
+        xban = minetest.get_modpath("xban"),
+        xban2 = minetest.get_modpath("xban2"),
+        verification = minetest.get_modpath("verification"),
+    },
+
+    log = function(level, message, ...)
+        message = message:format(...)
+        minetest.log(level, ("[%s] %s"):format(modname, message))
+    end,
+
+    chat_send_player = function(player, message, ...)
+        message = message:format(...)
+        if type(player) ~= "string" then
+            player = player:get_player_name()
+        end
+        minetest.chat_send_player(player, message)
+        local irc_message = minetest.strip_colors(message)
+        if verbana.has.irc and irc.joined_players[player] then
+            irc.say(player, irc_message)
+        end
+        if verbana.has.irc2 and irc2.joined_players[player] then
+            irc2.say(player, irc_message)
+        end
+    end,
+
+    assert_warn = function(value, message, ...)
+        if not value then
+            verbana.log("warning", message, ...)
+        end
+        return value
+    end,
+
+	dofile = function(...)
+		dofile(table.concat({modpath, ...}, DIR_DELIM) .. ".lua")
+	end,
+}
 
 -- settings
-dofile(verbana.modpath .. '/settings.lua')
-dofile(verbana.modpath .. '/privs.lua')
+verbana.dofile("settings")
 
 if verbana.settings.debug_mode then
-    verbana.log('warning', 'Verbana is running in debug mode.')
+    verbana.log("warning", "Verbana is running in debug mode.")
 end
 
 -- libraries
-dofile(verbana.modpath .. '/util.lua')
-dofile(verbana.modpath .. '/lib_ip.lua')
-dofile(verbana.modpath .. '/lib_asn.lua')
+verbana.dofile("util")
+verbana.dofile("lib", "init")
 
 -- connect to the DB - restrict access to full insecure environment to this point
-local ie = minetest.request_insecure_environment()
-if not ie then
-	error('Verbana will not work unless it has been listed under secure.trusted_mods in minetest.conf')
-end
+local ie = assert(
+    minetest.request_insecure_environment(),
+    "Verbana will not work unless it has been listed under secure.trusted_mods in minetest.conf"
+)
 
-local sql = ie.require('lsqlite3')
+verbana.ie = {
+    lfs = assert(ie.require("lfs"), "Verbana will not function without lfs. See README.md"),
+    imath = assert(ie.require("imath"), "Verbana will not function without limath. See README.md"),
+    sqlite = ie.require("lsqlite3"),
+    pgsql = assert(ie.require("pgsql"), "Verbana will not function without pgsql. See README.md"),
+    http_api = verbana.assert_warn(minetest.request_http_api(), "Verbana will automatically update network information without http access. See README.md"),
+}
+
 ie = nil -- nuke this as quickly as possible
 
-if not sql then
-    error('Verbana will not work unless lsqlite3 is installed. See README.txt')
-end
-verbana.sql = sql
-local db_location = verbana.settings.db_path
-local db, _, errmsg = sql.open(db_location)
-if not db then
-    error(('Verbana could not open its database @ %q: %q'):format(db_location, errmsg))
-else
-    verbana.db = db
-end
-
-minetest.register_on_shutdown(verbana.util.safe(function()
-    local ret_code = db:close()
-    if ret_code ~= sql.OK then
-        verbana.log('error', 'Error closing DB: %s', db:error_message())
-    end
-end))
-
-
 -- core
-dofile(verbana.modpath .. '/data.lua') -- data must go first
-dofile(verbana.modpath .. '/chat.lua') -- chat must go before login_handling
-dofile(verbana.modpath .. '/login_handling.lua')
-dofile(verbana.modpath .. '/imports/sban.lua') -- must go before commands
-dofile(verbana.modpath .. '/imports/xban.lua') -- must go before commands
-dofile(verbana.modpath .. '/commands.lua')
+verbana.dofile("privs")  -- must go before chat
+verbana.dofile("data", "init") -- must go before chat
+verbana.dofile("chat", "init") -- chat must go before login_handling
+verbana.dofile("login_handling")
+verbana.dofile("imports", "init") -- must go before commands
+verbana.dofile("commands", "init")
 
 -- cleanup (prevent access to insecure environment from any outside mod, or in-game)
 sqlite3 = nil
-verbana.sql = nil
-verbana.db = nil
+verbana.ie = nil

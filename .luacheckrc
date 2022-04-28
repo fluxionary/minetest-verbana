@@ -6,6 +6,7 @@ read_globals = {
   "vector",
   "os",
   "sqlite3",
+  "DIR_DELIM"
 }
 
 globals = {

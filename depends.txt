@@ -1,4 +1,0 @@
-irc?
-irc2?
-sban?
-verification?
