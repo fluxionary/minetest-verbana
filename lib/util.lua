@@ -8,6 +8,24 @@ local time_units = {
     y = 60 * 60 * 24 * 365,
 }
 
+function verbana.util.is_u8(i)
+    return (
+        type(i) == "number" and
+        math.round(i) == i and
+        0 <= i and
+        i <= 0xFF
+    )
+end
+
+function verbana.util.is_u16(i)
+    return (
+        type(i) == "number" and
+        math.round(i) == i and
+        0 <= i and
+        i <= 0xFFFF
+    )
+end
+
 function verbana.util.parse_timespan(text)
     if type(text) ~= "string" then
         return nil
@@ -38,6 +56,10 @@ function verbana.util.load_file(filename)
     local contents = file:read("*a")
     file:close()
     return contents
+end
+
+function verbana.util.write_file(filename, contents)
+
 end
 
 function verbana.util.table_invert(t)

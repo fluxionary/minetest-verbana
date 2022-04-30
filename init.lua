@@ -8,7 +8,10 @@ verbana = {
 
     has = {
         irc = minetest.get_modpath("irc"),
+        irc_commands = minetest.get_modpath("irc_commands"),
+        -- irc2 is blocky survival's hacky way of connecting to two separate irc servers simultaneously
         irc2 = minetest.get_modpath("irc2"),
+        irc_commands2 = minetest.get_modpath("irc_commands2"),
         sban = minetest.get_modpath("sban"),
         xban = minetest.get_modpath("xban"),
         xban2 = minetest.get_modpath("xban2"),
@@ -18,21 +21,6 @@ verbana = {
     log = function(level, message, ...)
         message = message:format(...)
         minetest.log(level, ("[%s] %s"):format(modname, message))
-    end,
-
-    chat_send_player = function(player, message, ...)
-        message = message:format(...)
-        if type(player) ~= "string" then
-            player = player:get_player_name()
-        end
-        minetest.chat_send_player(player, message)
-        local irc_message = minetest.strip_colors(message)
-        if verbana.has.irc and irc.joined_players[player] then
-            irc.say(player, irc_message)
-        end
-        if verbana.has.irc2 and irc2.joined_players[player] then
-            irc2.say(player, irc_message)
-        end
     end,
 
     assert_warn = function(value, message, ...)

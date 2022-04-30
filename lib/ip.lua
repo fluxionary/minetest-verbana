@@ -1,44 +1,6 @@
-verbana.lib_ip = {}
+verbana.lib.ip = {}
 
-local function is_u8(i)
-    return (
-        type(i) == "number" and
-        math.round(i) == i and
-        0 <= i and
-        i <= 0xFF
-    )
-end
-
-local function is_u16(i)
-    return (
-        type(i) == "number" and
-        math.round(i) == i and
-        0 <= i and
-        i <= 0xFFFF
-    )
-end
-
-local function parse_ipv4(ipstr)
-    if type(ipstr) ~= "string" then
-        return
-    end
-    local a, b, c, d = ipstr:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
-    a = tonumber(a)
-    b = tonumber(b)
-    c = tonumber(c)
-    d = tonumber(d)
-    if is_u8(a) and is_u8(b) and is_u8(c) and is_u8(d) then
-        return (a * 16777216) + (b * 65536) + (c * 256) + d
-    end
-    a, b, c, d = ipstr:match("^::ffff:(%d+)%.(%d+)%.(%d+)%.(%d+)$")
-    a = tonumber(a)
-    b = tonumber(b)
-    c = tonumber(c)
-    d = tonumber(d)
-    if is_u8(a) and is_u8(b) and is_u8(c) and is_u8(d) then
-        return (a * 16777216) + (b * 65536) + (c * 256) + d
-    end
-end
+local imath = verbana.ie.imath
 
 local function parse_ipv6(ipstr)
     if type(ipstr) ~= "string" then
@@ -68,7 +30,7 @@ local function parse_ipv6(ipstr)
             b = tonumber(b)
             c = tonumber(c)
             d = tonumber(d)
-            if a and b and c and d then
+            if is_u8(a) and is_u8(b) and is_u8(c) and is_u8(d) then
                 table.insert(chunks, (a * 256) + b)
                 table.insert(chunks, (c * 256) + d)
                 index = #ipstr + 1
@@ -106,7 +68,7 @@ local function parse_ipv6(ipstr)
         return  -- something went wrong
     end
 
-    local total = 0
+    local total = imath.new()
     for _, chunk in ipairs(before_chunks) do
         if not is_u16(chunk) then
             return
@@ -117,31 +79,24 @@ local function parse_ipv6(ipstr)
     return total
 end
 
+local function parse_ipv4(ipstr)
+    if type(ipstr) ~= "string" then
+        return
+    end
+    return parse_ipv6("::ffff:" .. ipstr)
+end
+
 
 function verbana.lib_ip.is_valid_ip(ipstr)
-    if type(ipstr) ~= "string" then return false end
-    local a, b, c, d = ipstr:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
-    a = tonumber(a)
-    b = tonumber(b)
-    c = tonumber(c)
-    d = tonumber(d)
-    if not (a and b and c and d) then return false end
-    return 0 <= a and a < 256 and 0 <= b and b < 256 and 0 <= c and c < 256 and 0 <= d and d < 256
+    return parse_ipv4(ipstr) or parse_ipv6(ipstr)
 end
 
 function verbana.lib_ip.ipstr_to_ipint(ipstr)
-    local a, b, c, d = ipstr:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
-    return (tonumber(a) * 16777216) + (tonumber(b) * 65536) + (tonumber(c) * 256) + tonumber(d)
+    return parse_ipv4(ipstr) or parse_ipv6(ipstr)
 end
 
 function verbana.lib_ip.ipint_to_ipstr(number)
-    local d = number % 256
-    number = math.floor(number / 256)
-    local c = number % 256
-    number = math.floor(number / 256)
-    local b = number % 256
-    local a = math.floor(number / 256)
-    return ("%u.%u.%u.%u"):format(a, b, c, d)
+    error("todo") -- TODO
 end
 
 function verbana.lib_ip.netstr_to_bounds(ipnet)
@@ -161,6 +116,7 @@ function data.fumble_about_for_an_ip(name, player_id)
             ipstr = info.address
         end
     end
+
     if not ipstr then
         if not player_id then player_id = data.get_player_id(name) end
         local connection_log = data.get_player_connection_log(player_id, 1)

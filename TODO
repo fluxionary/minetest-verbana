@@ -1,18 +1,25 @@
-refactor (too many huge files)
+* [ ] refactor (too many huge files)
 
-postgres support
-* migration from sqlite
+* [ ] postgres support
+* [ ] #12 ipv6 support
+* [ ] migration from sqlite
 
-ipv6 support
+* [x] remove direct irc dependency, create an API for mods to register to verbana messages
+* [ ] make hooks for IRC to use that API
+* [ ] #2 verbana commands should show up on IRC, if executed from IRC
 
 -------------
-improve documentation.
-
-create a way to search for players by IP/net instead of just ASN
-
-incorporate alt status/connection logs into results...
-
-alert staff if there are new reports since their last login
-
-make settings for the hard-coded values for report rate limiting
-
+* [ ] improve documentation.
+* [ ] create a way to search for players by IP/net instead of just ASN
+* [ ] incorporate alt status/connection logs into results...
+* [ ] alert staff if there are new reports since their last login
+* [ ] make settings for the hard-coded values for report rate limiting
+* [x] #3 kick privilege by default
+* [ ] #4 add associated IPs to //whois and /ban_record
+* [ ] #5 Add a easier way to use ASN from in game
+* [ ] #6 add optional support for keeping the ASN data up-to-date using secure.http_mods
+* [ ] #7 command to "watch" ASN
+* [ ] #8 allow creation (and removal of) ad-hoc networks
+* [ ] #9 support importing xban2 dbs
+* [ ] #10 Reconsider the behavior of commands issued by unverified players
+* [ ] #11 add support for minetest ban logic

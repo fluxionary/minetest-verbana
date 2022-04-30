@@ -1,22 +1,33 @@
 verbana.chat = {}
 
-local data = verbana.data
 local has = verbana.has
 local privs = verbana.privs
 
-function verbana.chat.send_mods(message, ...)
-    message = message:format(...)
-    local irc_message = "[verbana] " .. minetest.strip_colors(message)
-    if has.irc then
-        irc.say(irc_message)
-    end
-    if has.irc2 then
-        irc2.say(irc_message)
+
+function verbana.chat.send_player(player, message, ...)
+    if #{...} > 0 then
+        message = message:format(...)
     end
 
-    for _, player in ipairs(minetest.get_connected_players()) do
-        if privs.is_privileged(player) then
-            verbana.chat_send_player(player, message)
+    if type(player) ~= "string" then
+        player = player:get_player_name()
+    end
+
+    if not verbana.api.chat.do_send_player(player, message) then
+        minetest.chat_send_player(player, message)
+    end
+end
+
+function verbana.chat.send_mods(message, ...)
+    if #{...} > 0 then
+        message = message:format(...)
+    end
+
+    if not verbana.api.chat.do_send_mods(message) then
+        for _, player in ipairs(minetest.get_connected_players()) do
+            if privs.is_privileged(player) then  -- mods and admins
+                verbana.chat.send_player(player, message)
+            end
         end
     end
 end

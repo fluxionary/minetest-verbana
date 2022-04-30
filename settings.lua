@@ -67,7 +67,7 @@ verbana.settings = {
 
     admin_priv = get_setting("verbana.admin_priv", "ban_admin"),
     moderator_priv = get_setting("verbana.moderator_priv", "ban"),
-    kick_priv = get_setting("verbana.kick_priv", nil),
+    kick_priv = get_setting("verbana.kick_priv", "kick"),
 
     verified_privs = minetest.string_to_privs(get_setting("default_privs", "shout,interact")),
     unverified_privs = minetest.string_to_privs(get_setting("verbana.unverified_privs", "shout")),
