@@ -37,14 +37,11 @@ verbana = {
 
 -- settings
 verbana.dofile("settings")
+verbana.dofile("privs")
 
 if verbana.settings.debug_mode then
     verbana.log("warning", "Verbana is running in debug mode.")
 end
-
--- libraries
-verbana.dofile("util")
-verbana.dofile("lib", "init")
 
 -- connect to the DB - restrict access to full insecure environment to this point
 local ie = assert(
@@ -63,16 +60,16 @@ verbana.ie = {
         "Verbana cannot automatically update network information without iconv. See README.md"),
 }
 
-ie = nil -- nuke this as quickly as possible
-
 -- core
-verbana.dofile("privs")  -- must go before chat
-verbana.dofile("data", "init") -- must go before chat
-verbana.dofile("chat", "init") -- chat must go before login_handling
-verbana.dofile("login_handling")
+verbana.dofile("lib", "init") -- lib must go first
+verbana.dofile("data", "init")
+verbana.dofile("db", "init") -- db must go before chat
+verbana.dofile("chat", "init") -- chat must go before callbacks
+verbana.dofile("callbacks", "init")
 verbana.dofile("imports", "init") -- must go before commands
 verbana.dofile("commands", "init")
 
 -- cleanup (prevent access to insecure environment from any outside mod, or in-game)
+ie = nil
 sqlite3 = nil
 verbana.ie = nil

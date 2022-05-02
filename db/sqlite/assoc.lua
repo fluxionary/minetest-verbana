@@ -11,12 +11,14 @@ function data.assoc(player_id, ipint, asn)
     if not execute_bind_one(update_code, "update assoc", now, player_id, ipint, asn) then return false end
     return true
 end
+
 function data.has_asn_assoc(player_id, asn)
     player_id = data.get_master(player_id) or player_id
     local code = ""
     local table = get_full_table(code, "find player asn assoc", player_id, asn)
     return #table == 1
 end
+
 function data.has_ip_assoc(player_id, ipint)
     player_id = data.get_master(player_id) or player_id
     local code = ""

@@ -1,6 +1,14 @@
 verbana.lib.ip = {}
+local ip = verbana.lib.ip
 
 local imath = verbana.ie.imath
+
+local data = verbana.data
+local util = verbana.util
+
+local is_u8 = util.is_u8
+local is_u16 = util.is_u16
+local log = verbana.log
 
 local function parse_ipv6(ipstr)
     if type(ipstr) ~= "string" then
@@ -87,47 +95,23 @@ local function parse_ipv4(ipstr)
 end
 
 
-function verbana.lib_ip.is_valid_ip(ipstr)
+function ip.is_valid_ip(ipstr)
     return parse_ipv4(ipstr) or parse_ipv6(ipstr)
 end
 
-function verbana.lib_ip.ipstr_to_ipint(ipstr)
+function ip.ipstr_to_ipint(ipstr)
     return parse_ipv4(ipstr) or parse_ipv6(ipstr)
 end
 
-function verbana.lib_ip.ipint_to_ipstr(number)
+function ip.ipint_to_ipstr(ipint)
     error("todo") -- TODO
 end
 
-function verbana.lib_ip.netstr_to_bounds(ipnet)
+function ip.netstr_to_bounds(ipnet)
     local ip, net = ipnet:match("^(.*)/(%d+)$")
-    local start = verbana.lib_ip.ipstr_to_ipint(ip)
+    local start = verbana.lib.ip.ipstr_to_ipint(ip)
     net = tonumber(net)
     local end_ = start + (2 ^ (32 - net)) - 1
     return start, end_
 end
-
-function data.fumble_about_for_an_ip(name, player_id)
-    -- for some reason, get_player_ip is unreliable during register_on_newplayer
-    local ipstr = minetest.get_player_ip(name)
-    if not ipstr then
-        local info = minetest.get_player_information(name)
-        if info then
-            ipstr = info.address
-        end
-    end
-
-    if not ipstr then
-        if not player_id then player_id = data.get_player_id(name) end
-        local connection_log = data.get_player_connection_log(player_id, 1)
-        if not connection_log or #connection_log ~= 1 then
-            log("warning", "player %s exists but has no connection log?", player_id)
-        else
-            local last_login = connection_log[1]
-            ipstr = lib_ip.ipint_to_ipstr(last_login.ipint)
-        end
-    end
-    return ipstr
-end
-
 

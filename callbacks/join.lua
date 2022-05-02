@@ -10,11 +10,11 @@ local safe                    = util.safe
 
 local spawn_pos               = settings.spawn_pos
 local unverified_spawn_pos    = settings.unverified_spawn_pos
+local jail_bounds             = settings.jail_bounds
+local jail_check_period       = settings.jail_check_period
+local using_verification_jail = jail_bounds and jail_check_period
 
-
-
-
-minetest.register_on_joinplayer(safe(function(player)
+function verbana.callbacks.on_joinplayer(player)
     local name = player:get_player_name()
     local player_id = data.get_player_id(name)
     local player_status = data.get_player_status(player_id)
@@ -43,7 +43,7 @@ minetest.register_on_joinplayer(safe(function(player)
         end
     end
 
-    if USING_VERIFICATION_JAIL then
+    if using_verification_jail then
         if should_rejail(player, player_status) then
             log("action", "spawning %s in verification jail", name)
             if not settings.debug_mode then
@@ -56,4 +56,9 @@ minetest.register_on_joinplayer(safe(function(player)
             end
         end
     end
+end
+
+
+minetest.register_on_joinplayer(safe(function(...)
+    return verbana.callbacks.on_joinplayer(...)
 end))

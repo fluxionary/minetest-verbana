@@ -1,3 +1,4 @@
+verbana.callbacks = {}
 
 verbana.dofile("callbacks", "prejoin")
 verbana.dofile("callbacks", "new_player")

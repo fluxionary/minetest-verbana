@@ -2,7 +2,7 @@ verbana.lib_asn = {}
 
 verbana.lib_asn.invalid_asn_description = "Invalid ASN"
 
-local lib_ip = verbana.lib_ip
+local lib_ip = verbana.lib.ip
 local settings = verbana.settings
 
 local load_file = verbana.util.load_file

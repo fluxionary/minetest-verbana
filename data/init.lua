@@ -1,7 +1,7 @@
 local http = verbana.ie.http
 local iconv = verbana.ie.iconv
 
-if not http then
+if not (http and iconv) then
     return
 end
 
@@ -10,7 +10,7 @@ verbana.data = {}
 function verbana.data.do_update_data_used_autnums(result)
     if result.completed and result.succeeded then
         assert(filename)
-        verbana.lib.util.write_file(filename, iconv.from("iso-8859-1", result))
+        verbana.util.write_file(filename, iconv.from("iso-8859-1", result))
     else
         verbana.log("warning", "problem updating ")
     end

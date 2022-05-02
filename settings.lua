@@ -1,34 +1,42 @@
+local modpath = verbana.modpath
+local worldpath = minetest.get_worldpath()
+
+local settings = minetest.settings
 
 local function get_setting(name, default)
-    local setting = minetest.settings:get(name)
-    if not setting or setting == "" then
-        return default
-    end
-    return setting
+    local setting = settings:get("verbana." .. name)
+    return setting or default
+end
+
+local function get_bool(name, default)
+    return settings:get_bool("verbana." .. name, default)
 end
 
 local function get_jail_bounds()
     -- (x1,y1,z1),(x2,y2,z2)
-    local bounds = minetest.settings:get("verbana.jail_bounds")
+    local bounds = settings:get("verbana.jail_bounds")
     if not bounds or bounds == "" then
         return nil
     end
     local x1, y1, z1, x2, y2, z2 = bounds:match(
         "^%s*%(%s*(%-?%d+)%s*,%s*(%-?%d+)%s*,%s*(%-?%d+)%s*%),%(%s*(%-?%d+)%s*,%s*(%-?%d+)%s*,%s*(%-?%d+)%s*%)%s*$"
     )
-    if not x1 then
-        verbana.log("warning", "The setting of verbana.jail_bounds %q is invalid, ignoring.", bounds)
-        return nil
-    end
     x1 = tonumber(x1)
     y1 = tonumber(y1)
     z1 = tonumber(z1)
     x2 = tonumber(x2)
     y2 = tonumber(y2)
     z2 = tonumber(z2)
+
+    if not (x1 and y1 and z1 and x2 and y2 and z2) then
+        verbana.log("warning", "The setting of verbana.jail_bounds (%q) is invalid, ignoring.", bounds)
+        return nil
+    end
+
     if x1 > x2 then x1, x2 = x2, x1 end
     if y1 > y2 then y1, y2 = y2, y1 end
     if z1 > z2 then z1, z2 = z2, z1 end
+
     return {vector.new(x1, y1, z1), vector.new(x2, y2, z2)}
 end
 
@@ -40,52 +48,59 @@ local debug_is_default = (
     verbana.has.verification
 ) and "true" or "false"
 
-local world_path = minetest.get_worldpath()
-
 verbana.settings = {
-    universal_verification = minetest.settings:get_bool("verbana.universal_verification", false),
+    universal_verification = get_bool("verbana.universal_verification", false),
     set_universal_verification = function(value)
         if type(value) == "boolean" then
-            minetest.settings:set_bool("verbana.universal_verification", value)
+            settings:set_bool("verbana.universal_verification", value)
             verbana.settings.universal_verification = value
         else
             verbana.log("error", "tried to set universal verification to %q", value)
         end
     end,
 
-    pg_host = get_setting("verbana.pg_host", "127.0.0.1"),
-    pg_port = get_setting("verbana.pg_port", "5432"),
-    pg_database = get_setting("verbana.pg_database", "verbana"),
-    pg_user = get_setting("verbana.pg_user", "verbana"),
-    pg_password = get_setting("verbana.pg_password", ""),
+    backend = get_setting("backend", "postgres"),
 
-    -- TODO: handle migration from sqlite
-    --db_path = get_setting("verbana.db_path", ("%s/verbana.sqlite"):format(world_path)),
-    asn_description_path = get_setting("verbana.asn_description_path", ("%s/data-used-autnums"):format(verbana.modpath)),
-    asn_data_path = get_setting("verbana.asn_data_path", ("%s/data-raw-table"):format(verbana.modpath)),
-    ipv6_data_path = get_setting("verbana.asn_data_path", ("%s/ipv6-raw-table"):format(verbana.modpath)),
+    sqlite_path = get_setting("sqlite_path", ("%s/verbana.sqlite"):format(worldpath)),
 
-    admin_priv = get_setting("verbana.admin_priv", "ban_admin"),
-    moderator_priv = get_setting("verbana.moderator_priv", "ban"),
-    kick_priv = get_setting("verbana.kick_priv", "kick"),
+    pg_host = get_setting("pg_host", "127.0.0.1"),
+    pg_port = get_setting("pg_port", "5432"),
+    pg_database = get_setting("pg_database", "verbana"),
+    pg_user = get_setting("pg_user", "verbana"),
+    pg_password = get_setting("pg_password", ""),
 
-    verified_privs = minetest.string_to_privs(get_setting("default_privs", "shout,interact")),
-    unverified_privs = minetest.string_to_privs(get_setting("verbana.unverified_privs", "shout")),
-    whitelisted_privs = minetest.string_to_privs(get_setting("verbana.whitelisted_privs", "")),
+    used_autnums_url = get_setting("used_autnums_url", "http://thyme.apnic.net/current/data-used-autnums"),
+    used_autnums_path = get_setting("used_autnums_path", ("%s/data/used-autnums"):format(modpath)),
+    ipv4_raw_table_url = get_setting("ipv4_raw_table_url", "http://thyme.apnic.net/current/data-raw-table"),
+    ipv4_raw_table_path = get_setting("ipv4_raw_table_path", ("%s/data/ipv4-raw-table"):format(modpath)),
+    ipv6_raw_table_url = get_setting("ipv6_raw_table_url", "https://thyme.apnic.net/current/ipv6-raw-table"),
+    ipv6_raw_table_path = get_setting("ipv6_raw_table_path", ("%s/data/ipv6-raw-table"):format(modpath)),
+    asn_table_update_period = get_setting(),
+    asn_table_update_on_start = get_bool(),
 
-    spawn_pos = minetest.string_to_pos(get_setting("static_spawnpoint", "(0,0,0)")),
+    admin_priv = get_setting("admin_priv", "ban_admin"),
+    moderator_priv = get_setting("moderator_priv", "ban"),
+    kick_priv = get_setting("kick_priv", "kick"),
+
+    verified_privs = minetest.string_to_privs(settings:get("default_privs") or "shout,interact"),
+    unverified_privs = minetest.string_to_privs(get_setting("unverified_privs", "shout")),
+    whitelisted_privs = minetest.string_to_privs(get_setting("whitelisted_privs", "")),
+
+    spawn_pos = minetest.string_to_pos(settings:get("static_spawnpoint") or "(0,0,0)"),
 
     jail_bounds = get_jail_bounds(),
-    jail_check_period = tonumber(get_setting("verbana.jail_check_period")),
+    jail_check_period = tonumber(get_setting("jail_check_period")),
 
-    debug_mode = get_setting("verbana.debug_mode", debug_is_default) == "true"
+    debug_mode = get_setting("debug_mode", debug_is_default) == "true"
 }
 
-if #verbana.settings.whitelisted_privs == 0 then verbana.settings.whitelisted_privs = nil end
+if #verbana.settings.whitelisted_privs == 0 then
+    verbana.settings.whitelisted_privs = nil
+end
 
 verbana.settings.unverified_spawn_pos = minetest.string_to_pos(
     get_setting(
-        "verbana.unverified_spawn_pos",
+        "unverified_spawn_pos",
         minetest.pos_to_string(verbana.settings.spawn_pos)
     )
 )

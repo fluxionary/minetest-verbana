@@ -1,15 +1,17 @@
-
 -- wrap sqllite API to make error reporting less messy
-local function check_description(description)
+
+vervana.sqlite.db_class = verbana.lib.make_class()
+
+function verbana.db.sqlite.check_description(description)
     return (
         type(description) == "string" and
         description ~= ""
     )
 end
 
-local function execute(code, description)
-    if not check_description(description) then
-        log("error", "bad description for execute: %q", tostring(description))
+function verbana.db.sqlite.execute(code, description)
+    if not verbana.db.sqlite.check_description(description) then
+        verbana.log("error", "bad description for execute: %q", tostring(description))
         return false
     end
     if db:exec(code) ~= sql.OK then
@@ -19,7 +21,7 @@ local function execute(code, description)
     return true
 end
 
-local function prepare(code, description)
+function verbana.db.sqlite.prepare(code, description)
     if not check_description(description) then
         log("error", "bad description for prepare: %q", tostring(description))
         return
@@ -32,7 +34,7 @@ local function prepare(code, description)
     return statement
 end
 
-local function bind(statement, description, ...)
+function verbana.db.sqlite.bind(statement, description, ...)
     if not check_description(description) then
         log("error", "bad description for bind: %q", tostring(description))
         return false
@@ -44,7 +46,7 @@ local function bind(statement, description, ...)
     return true
 end
 
-local function bind_and_step(statement, description, ...)
+function verbana.db.sqlite.bind_and_step(statement, description, ...)
     if not check_description(description) then
         log("error", "bad description for bind_and_step: %q", tostring(description))
         return false
@@ -58,7 +60,7 @@ local function bind_and_step(statement, description, ...)
     return true
 end
 
-local function finalize(statement, description)
+function verbana.db.sqlite.finalize(statement, description)
     if not check_description(description) then
         log("error", "bad description for finalize: %q", tostring(description))
         return false
@@ -70,7 +72,7 @@ local function finalize(statement, description)
     return true
 end
 
-local function execute_bind_one(code, description, ...)
+function verbana.db.sqlite.execute_bind_one(code, description, ...)
     if not check_description(description) then
         log("error", "bad description for execute_bind_one: %q", tostring(description))
         return false
@@ -82,7 +84,7 @@ local function execute_bind_one(code, description, ...)
     return true
 end
 
-local function get_full_table(code, description, ...)
+function verbana.db.sqlite.get_full_table(code, description, ...)
     if not check_description(description) then
         log("error", "bad description for get_full_table: %q", tostring(description))
         return false
@@ -98,7 +100,7 @@ local function get_full_table(code, description, ...)
     return rows
 end
 
-local function get_full_ntable(code, description, ...)
+function verbana.db.sqlite.get_full_ntable(code, description, ...)
     if not check_description(description) then
         log("error", "bad description for get_full_ntable: %q", tostring(description))
         return
@@ -114,7 +116,7 @@ local function get_full_ntable(code, description, ...)
     return rows
 end
 
-local function sort_status_table(status_table)
+function verbana.db.sqlite.sort_status_table(status_table)
     local sortable = {}
     for _, value in pairs(status_table) do table.insert(sortable, value) end
     table.sort(sortable, function (a, b) return a.id < b.id end)

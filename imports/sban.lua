@@ -2,9 +2,9 @@ verbana.import = verbana.import or {}
 verbana.import.sban = {}
 local _sban = {}
 
-local data = verbana.data
-local lib_asn = verbana.lib_asn
-local lib_ip = verbana.lib_ip
+local db = verbana.db
+local lib_asn = verbana.lib.asn
+local lib_ip = verbana.lib.ip
 local util = verbana.util
 local log = verbana.log
 
@@ -82,8 +82,8 @@ function _sban.import(filename)
     if not finalize(insert_assoc_statement, 'insert assoc') then return _error() end
     if not finalize(insert_log_statement, 'insert connection log') then return _error() end
     -- player status --
-    local default_player_status_id = data.player_status.default.id
-    local banned_player_status_id = data.player_status.banned.id
+    local default_player_status_id = db.player_status.default.id
+    local banned_player_status_id = db.player_status.banned.id
     local insert_player_status_sql = [[
         INSERT OR IGNORE
           INTO player_status_log (executor_id, player_id, status_id, timestamp, reason, expires)
