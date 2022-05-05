@@ -1,3 +1,4 @@
+local db_class = verbana.db.sqlite.db_class
 
 local player_id_cache = {}
 function data.get_player_id(name, create_if_new)

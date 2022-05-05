@@ -1,3 +1,4 @@
+local db_class = verbana.db.sqlite.db_class
 
 function data.register_asn(asn)
     local code = ""

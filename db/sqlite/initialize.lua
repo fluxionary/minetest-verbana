@@ -1,64 +1,89 @@
+local sqlite = verbana.ie.sqlite
+local log = verbana.log
 
-data.version = 2
+local sql = verbana.sql.sqlite.initialize
+
+local db_class = verbana.db.sqlite.db_class
+
+local version = 2
 
 -- SCHEMA INITIALIZATION
-local function get_current_schema_version()
-    local code = [[
-    ]]
-    local rows = get_full_ntable(code, "does version table exist?", "version")
+function db_class:_get_current_schema_version()
+    local rows = self:_get_full_ntable(sql.does_version_table_exist, "does version table exist?", "version")
     if not rows or #rows > 1 then
         log("error", "error checking if version table exists")
         return
     end -- ERROR
-    if #rows == 0 then return 0 end -- if version table doesn't exist, assume DB is version 1
-    code = [[]]
-    rows = get_full_ntable(code, "get current version")
+
+    if #rows == 0 then
+        return 0
+    end -- if version table doesn't exist, assume DB is version 1
+
+    rows = self:_get_full_ntable(sql.get_current_version, "get current version")
     if not rows or #rows ~= 1 then
         log("error", "error querying version table")
         return
     end -- ERROR
+
     return rows[1].version
 end
 
-local function set_current_schema_version(version)
-    local code = [[]]
-    execute_bind_one(code, "set current schema version", version)
+function db_class:_set_current_schema_version(version)
+    self._execute_bind_one(
+        sql.set_current_schema_version,
+        "set current schema version",
+        version
+    )
 end
 
-local function init_status_table(table_name, status_table)
-    local status_sql = (""):format(table_name)
-    local status_statement = prepare(status_sql, ("initialize %s_status"):format(table_name))
-    if not status_statement then return false end
+
+
+local function sort_status_table(status_table)
+    local sortable = {}
+    for _, value in pairs(status_table) do
+        table.insert(sortable, value)
+    end
+    table.sort(sortable, function (a, b) return a.id < b.id end)
+    return sortable
+end
+
+function db_class:_init_status_table(table_name, status_table)
+    local status_sql = sql[("initialize_%s_status"):format(table_name)]
+    local status_statement = self._prepare(status_sql, ("initialize %s_status"):format(table_name))
+
+    if not status_statement then
+        return false
+    end
+
     for _, status in ipairs(sort_status_table(status_table)) do
-        if not bind_and_step(status_statement, "insert status", status.id, status.name) then
+        if not self:_bind_and_step(status_statement, "insert status", status.id, status.name) then
             return false
         end
     end
-    if not finalize(status_statement, "insert status") then
+
+    if not self._finalize(status_statement, "insert status") then
         return false
     end
+
     return true
 end
 
-local function intialize_schema()
-    verbana.log("action", "initializing schema")
-    local schema = util.load_file(verbana.modpath .. "/schema.sql")
-    if not schema then
-        error(("[Verbana] Could not find Verbana schema at %q"):format(verbana.modpath .. "/schema.sql"))
-    end
-    if db:exec(schema) ~= sql.OK then
-        error(("[Verbana] failed to initialize the database: %s"):format(db:error_message()))
+function db_class:_intialize_schema()
+    -- TODO where is the schema and migrations?
+    log("action", "initializing schema")
+    if self._db:exec(verbana.sql.sqlite.schema) ~= sqlite.OK then
+        error(("[Verbana] failed to initialize the database: %s"):format(self._db:error_message()))
     end
 end
 
 local function migrate_db(version)
-    verbana.log("action", "migrating DB to version %s", version)
+    log("action", "migrating DB to version %s", version)
     local filename = ("%s/migrations/%s.sql"):format(verbana.modpath, version)
     local schema = util.load_file(filename)
     if not schema then
         error(("[Verbana] Could not find Verbana migration schema at %q"):format(filename))
     end
-    if db:exec(schema) ~= sql.OK then
+    if db:exec(schema) ~= sqlite.OK then
         error(("[Verbana] failed to migrate the database to version %s: %s"):format(version, db:error_message()))
     end
 end

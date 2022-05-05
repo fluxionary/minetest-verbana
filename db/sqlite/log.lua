@@ -1,3 +1,4 @@
+local db_class = verbana.db.sqlite.db_class
 
 function data.log(player_id, ipint, asn, success)
     local code = [[

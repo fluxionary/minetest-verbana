@@ -1,3 +1,4 @@
+local db_class = verbana.db.sqlite.db_class
 
 function data.assoc(player_id, ipint, asn)
     player_id = data.get_master(player_id) or player_id
