@@ -1,10 +1,15 @@
 local modname = minetest.get_current_modname()
 local modpath = minetest.get_modpath(modname)
+local S = minetest.get_translator(modname)
 
 verbana = {
-    version = "20220418.0",
+	version = os.time({year = 2022, month = 4, day = 18}),
+	fork = "fluxionary",
+
     modname = modname,
     modpath = modpath,
+
+	S = S,
 
     has = {
         irc = minetest.get_modpath("irc"),
