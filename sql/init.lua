@@ -18,5 +18,5 @@ function verbana.sql.load_files(base_path)
     return contents
 end
 
-verbana.dofile("sql", "sqlite", "init")
+--verbana.dofile("sql", "sqlite", "init")
 verbana.dofile("sql", "postgres", "init")

@@ -1,0 +1,3 @@
+INSERT INTO asn (asn_id)
+     VALUES     (?)
+ON CONFLICT DO NOTHING

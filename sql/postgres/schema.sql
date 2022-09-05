@@ -40,14 +40,14 @@ CREATE TABLE player (
   CREATE        INDEX player_last_login_id     ON player(last_login_id);
 
 CREATE TABLE ip (
-    ip                INET PRIMARY KEY
+    ip_id             INET PRIMARY KEY
   , current_status_id INTEGER REFERENCES ip_status_log ON DELETE RESTRICT
 );
-  CREATE INDEX ip_ip                ON ip USING GIST (ip INET_OPS);
+  CREATE INDEX ip_ip                ON ip USING GIST (ip_id INET_OPS);
   CREATE INDEX ip_current_status_id ON ip(current_status_id);
 
 CREATE TABLE asn (
-    asn               INTEGER PRIMARY KEY
+    asn_id            INTEGER PRIMARY KEY
   , current_status_id INTEGER REFERENCES asn_status_log ON DELETE RESTRICT
 );
   CREATE INDEX asn_current_status_id ON asn(current_status_id);
@@ -56,7 +56,7 @@ CREATE TABLE asn (
 
 CREATE TABLE player_status_log (
     id          INTEGER     PRIMARY KEY GENERATED ALWAYS AS IDENTITY
-  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIME) STORED
+  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
   , executor_id INTEGER     NOT NULL REFERENCES player        ON DELETE RESTRICT
   , player_id   INTEGER     NOT NULL REFERENCES player        ON DELETE RESTRICT
   , status_id   INTEGER     NOT NULL REFERENCES player_status ON DELETE RESTRICT
@@ -68,56 +68,56 @@ CREATE TABLE player_status_log (
 
 CREATE TABLE ip_status_log (
     id          INTEGER     PRIMARY KEY GENERATED ALWAYS AS IDENTITY
-  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIME) STORED
+  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
   , executor_id INTEGER     NOT NULL REFERENCES player    ON DELETE RESTRICT
-  , ip          INET        NOT NULL REFERENCES ip        ON DELETE RESTRICT
+  , ip_id       INET        NOT NULL REFERENCES ip        ON DELETE RESTRICT
   , status_id   INTEGER     NOT NULL REFERENCES ip_status ON DELETE RESTRICT
   , reason      TEXT
   , expires     INTEGER
 );
-  CREATE INDEX ip_status_log_ip        ON ip_status_log(ip);
+  CREATE INDEX ip_status_log_ip        ON ip_status_log(ip_id);
   CREATE INDEX ip_status_log_timestamp ON ip_status_log USING BRIN (timestamp);
 
 CREATE TABLE asn_status_log (
     id          INTEGER     PRIMARY KEY GENERATED ALWAYS AS IDENTITY
-  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIME) STORED
+  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
   , executor_id INTEGER     NOT NULL REFERENCES player     ON DELETE RESTRICT
-  , asn         INTEGER     NOT NULL REFERENCES asn        ON DELETE RESTRICT
+  , asn_id      INTEGER     NOT NULL REFERENCES asn        ON DELETE RESTRICT
   , status_id   INTEGER     NOT NULL REFERENCES asn_status ON DELETE RESTRICT
   , reason      TEXT
   , expires     INTEGER
 );
-  CREATE INDEX asn_status_log_asn       ON asn_status_log(asn);
+  CREATE INDEX asn_status_log_asn       ON asn_status_log(asn_id);
   CREATE INDEX asn_status_log_timestamp ON asn_status_log USING BRIN (timestamp);
 
 CREATE TABLE connection_log (
     id        INTEGER     PRIMARY KEY GENERATED ALWAYS AS IDENTITY
-  , timestamp TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIME) STORED
+  , timestamp TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
   , player_id INTEGER     NOT NULL REFERENCES player ON DELETE RESTRICT
-  , ip        INET        NOT NULL REFERENCES ip     ON DELETE RESTRICT
-  , asn       INTEGER     NOT NULL REFERENCES asn    ON DELETE RESTRICT
+  , ip_id     INET        NOT NULL REFERENCES ip     ON DELETE RESTRICT
+  , asn_id    INTEGER     NOT NULL REFERENCES asn    ON DELETE RESTRICT
   , success   BOOLEAN     NOT NULL
 );
   CREATE INDEX log_player    ON connection_log(player_id);
-  CREATE INDEX log_ip        ON connection_log(ip);
-  CREATE INDEX log_asn       ON connection_log(asn);
+  CREATE INDEX log_ip        ON connection_log(ip_id);
+  CREATE INDEX log_asn       ON connection_log(asn_id);
   CREATE INDEX log_timestamp ON connection_log USING BRIN (timestamp);
 
 CREATE TABLE assoc (
     player_id  INTEGER     NOT NULL REFERENCES player ON DELETE RESTRICT
-  , ip         INET        NOT NULL REFERENCES ip     ON DELETE RESTRICT
-  , asn        INTEGER     NOT NULL REFERENCES asn    ON DELETE RESTRICT
-  , first_seen TIMESTAMPTZ NOT NULL GENERATED ALWAYS AS (CURRENT_TIME) STORED
-  , last_seen  TIMESTAMPTZ NOT NULL
-  , PRIMARY KEY (player_id, ip, asn)
+  , ip_id      INET        NOT NULL REFERENCES ip     ON DELETE RESTRICT
+  , asn_id     INTEGER     NOT NULL REFERENCES asn    ON DELETE RESTRICT
+  , first_seen TIMESTAMPTZ NOT NULL GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
+  , last_seen  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+  , PRIMARY KEY (player_id, ip_id, asn_id)
 );
   CREATE INDEX assoc_player ON assoc(player_id);
-  CREATE INDEX assoc_ip     ON assoc(ip);
-  CREATE INDEX assoc_asn    ON assoc(asn);
+  CREATE INDEX assoc_ip     ON assoc(ip_id);
+  CREATE INDEX assoc_asn    ON assoc(asn_id);
 
 CREATE TABLE report (
     id          INTEGER     PRIMARY KEY GENERATED ALWAYS AS IDENTITY
-  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIME) STORED
+  , timestamp   TIMESTAMPTZ NOT NULL    GENERATED ALWAYS AS (CURRENT_TIMESTAMP) STORED
   , reporter_id INTEGER     NOT NULL REFERENCES player ON DELETE RESTRICT
   , report      TEXT        NOT NULL
 );
