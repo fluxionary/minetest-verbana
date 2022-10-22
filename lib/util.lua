@@ -12,24 +12,6 @@ local time_units = {
     y = 60 * 60 * 24 * 365,
 }
 
-function verbana.util.is_u8(i)
-    return (
-        type(i) == "number" and
-        math.round(i) == i and
-        0 <= i and
-        i <= 0xFF
-    )
-end
-
-function verbana.util.is_u16(i)
-    return (
-        type(i) == "number" and
-        math.round(i) == i and
-        0 <= i and
-        i <= 0xFFFF
-    )
-end
-
 function verbana.util.parse_timespan(text)
     if type(text) ~= "string" then
         return nil
@@ -40,88 +22,6 @@ function verbana.util.parse_timespan(text)
         return nil
     end
     return n * time_units[unit]
-end
-
-function verbana.util.file_exists(filename)
-   local handle = io.open(filename,"r")
-   if handle then
-       io.close(handle)
-       return true
-   else
-       return false
-   end
-end
-
-function verbana.util.load_file(filename)
-    local file = io.open(filename, "r")
-
-    if not file then
-        verbana.log("error", "error opening %q", filename)
-        return
-    end
-
-    local contents = file:read("*a")
-    file:close()
-    return contents
-end
-
-function verbana.util.write_file(filename, contents)
-    local file = io.open(filename, "w")
-
-    if not file then
-        verbana.log("error", "error opening %q for writing", filename)
-        return false
-    end
-
-    file:write(contents)
-    file:close()
-
-    return true
-end
-
-function verbana.util.table_invert(t)
-    local inverted = {}
-    for k,v in pairs(t) do inverted[v] = k end
-    return inverted
-end
-
-function verbana.util.table_reversed(t)
-    local len = #t
-    local reversed = {}
-    for i = len,1,-1 do
-        reversed[len - i + 1] = t[i]
-    end
-    return reversed
-end
-
-function verbana.util.table_contains(t, value)
-    for _, v in ipairs(t) do
-        if v == value then return true end
-    end
-    return false
-end
-
-function verbana.util.table_is_empty(t)
-    for _ in pairs(t) do return false end
-    return true
-end
-
-function verbana.util.iso_date(timestamp)
-    return os.date("%Y-%m-%dT%H:%M:%SZ", timestamp)
-end
-
-function verbana.util.safe(func, rv_on_fail)
-    -- wrap a function w/ logic to avoid crashing the game
-    return function(...)
-        local rvs = {xpcall(func, debug.traceback, ...)}
-        if rvs[1] then
-            table.remove(rvs, 1)
-            return unpack(rvs)
-        else
-            verbana.log("error", "Caught error: %s", rvs[2])
-            return rv_on_fail
-        end
-    end
 end
 
 function verbana.util.get_player_ip(player_name)
@@ -200,7 +100,7 @@ function verbana.util.should_unjail(player, player_status)
     if not jail_bounds then
         return false
     end
-    
+
     if player_status.id == data.player_status.unverified.id then
         return false
 

@@ -1,16 +1,37 @@
-max_line_length = false
+std = "lua51+luajit+minetest+verbana"
+unused_args = false
+max_line_length = 120
 
-read_globals = {
-  "irc",
-  "irc2",
-  "vector",
-  "os",
-  "sqlite3",
-  "DIR_DELIM"
+stds.minetest = {
+	read_globals = {
+		"DIR_DELIM",
+		"minetest",
+		"core",
+		"dump",
+		"vector",
+		"nodeupdate",
+		"VoxelManip",
+		"VoxelArea",
+		"PseudoRandom",
+		"ItemStack",
+		"default",
+		"table",
+		"math",
+		"string",
+	}
 }
 
-globals = {
-  "verbana",
-  "minetest",
+stds.verbana = {
+	globals = {
+		"verbana",
+  		"minetest",
+	},
+	read_globals = {
+		"irc",
+		"irc2",
+		"vector",
+		"os",
+		"sqlite3",
+		"DIR_DELIM"
+	},
 }
-

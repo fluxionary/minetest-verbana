@@ -3,12 +3,10 @@ local ip = verbana.lib.ip
 
 local imath = verbana.ie.imath
 
-local data = verbana.data
 local util = verbana.util
 
 local is_u8 = util.is_u8
 local is_u16 = util.is_u16
-local log = verbana.log
 
 local function parse_ipv6(ipstr)
     if type(ipstr) ~= "string" then
@@ -114,4 +112,3 @@ function ip.netstr_to_bounds(ipnet)
     local end_ = start + (2 ^ (32 - net)) - 1
     return start, end_
 end
-

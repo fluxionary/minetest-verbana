@@ -1,9 +1,13 @@
+local f = string.format
+
 local modname = minetest.get_current_modname()
 local modpath = minetest.get_modpath(modname)
 local S = minetest.get_translator(modname)
 
 verbana = {
-	version = os.time({year = 2022, month = 4, day = 18}),
+	author = "flux",
+	license = "AGPL_v3",
+	version = os.time({year = 2022, month = 10, day = 22}),
 	fork = "fluxionary",
 
     modname = modname,
@@ -23,10 +27,9 @@ verbana = {
         verification = minetest.get_modpath("verification"),
     },
 
-    log = function(level, message, ...)
-        message = message:format(...)
-        minetest.log(level, ("[%s] %s"):format(modname, message))
-    end,
+	log = function(level, messagefmt, ...)
+		return minetest.log(level, f("[%s] %s", modname, f(messagefmt, ...)))
+	end,
 
     assert_warn = function(value, message, ...)
         if not value then
@@ -36,7 +39,7 @@ verbana = {
     end,
 
 	dofile = function(...)
-		dofile(table.concat({modpath, ...}, DIR_DELIM) .. ".lua")
+		return dofile(table.concat({modpath, ...}, DIR_DELIM) .. ".lua")
 	end,
 }
 

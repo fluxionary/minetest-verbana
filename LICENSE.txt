@@ -1,9 +1,3 @@
-Ideas for this mod were taken liberally from sban (MIT license, Copyright (c) 2017 shivajiva101)
-and BillyS's verification mod (no listed license). Very little was explicitly copied, however.
-Not sure how that affects the license here.
-
-Otherwise:
--------------------------------------------------------------------------------
                     GNU AFFERO GENERAL PUBLIC LICENSE
                        Version 3, 19 November 2007
 
